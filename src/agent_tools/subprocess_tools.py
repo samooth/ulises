@@ -1,11 +1,8 @@
 import asyncio
-import logging
 import sys
 import time
 import collections
 from typing import Optional, Callable, Awaitable, Tuple, Dict
-
-logger = logging.getLogger(__name__)
 from src.constants import MAX_OUTPUT_CHARS
 
 DEFAULT_BASH_TIMEOUT = 60 * 60     # 1 hour
@@ -49,7 +46,7 @@ async def _run_subprocess_streaming(
                         "tail": "\n".join(list(tail)),
                     })
                 except Exception:
-                    pass  # progress callback is best-effort
+                    pass
             await asyncio.sleep(PROGRESS_INTERVAL_S)
 
     rd_out = asyncio.create_task(_reader(proc.stdout, stdout_full, "out"))
@@ -61,31 +58,23 @@ async def _run_subprocess_streaming(
         await asyncio.wait_for(proc.wait(), timeout=timeout)
     except asyncio.TimeoutError:
         timed_out = True
-            try:
-                proc.kill()
-            except ProcessLookupError:
-                pass  # already dead
-            except Exception as e:
-                logger.warning("kill failed (timeout path): %s", e)
-            try:
-                await asyncio.wait_for(proc.wait(), timeout=2)
-            except asyncio.TimeoutError:
-                pass  # best-effort wait
-            except Exception as e:
-                logger.warning("wait after kill failed (timeout path): %s", e)
-        except asyncio.CancelledError:
-            try:
-                proc.kill()
-            except ProcessLookupError:
-                pass  # already dead
-            except Exception as e:
-                logger.warning("kill failed (cancel path): %s", e)
-            try:
-                await asyncio.wait_for(proc.wait(), timeout=2)
-            except asyncio.TimeoutError:
-                pass  # best-effort wait
-            except Exception as e:
-                logger.warning("wait after kill failed (cancel path): %s", e)
+        try:
+            proc.kill()
+        except Exception:
+            pass
+        try:
+            await asyncio.wait_for(proc.wait(), timeout=2)
+        except Exception:
+            pass
+    except asyncio.CancelledError:
+        try:
+            proc.kill()
+        except Exception:
+            pass
+        try:
+            await asyncio.wait_for(proc.wait(), timeout=2)
+        except Exception:
+            pass
         for t in (rd_out, rd_err):
             t.cancel()
         if prog_task is not None:
@@ -101,10 +90,8 @@ async def _run_subprocess_streaming(
         for t in (rd_out, rd_err):
             try:
                 await asyncio.wait_for(t, timeout=1)
-            except (asyncio.TimeoutError, asyncio.CancelledError):
+            except Exception:
                 pass
-            except Exception as e:
-                logger.warning("reader drain failed: %s", e)
 
     return (
         "\n".join(stdout_full),
@@ -115,15 +102,16 @@ async def _run_subprocess_streaming(
 
 class BashTool:
     async def execute(self, content: str, ctx: dict) -> dict:
-        from src.tool_execution import agent_cwd, _truncate
+        from src.tool_execution import _AGENT_WORKDIR, _truncate
         progress_cb = ctx.get("progress_cb")
+        workspace = ctx.get("workspace")
         _subproc_env = ctx.get("subproc_env")
         proc = await asyncio.create_subprocess_shell(
             content,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
             env=_subproc_env,
-            cwd=agent_cwd(),
+            cwd=workspace or _AGENT_WORKDIR,
         )
         stdout, stderr, rc, timed_out = await _run_subprocess_streaming(
             proc,
@@ -141,15 +129,16 @@ class BashTool:
 
 class PythonTool:
     async def execute(self, content: str, ctx: dict) -> dict:
-        from src.tool_execution import agent_cwd, _truncate
+        from src.tool_execution import _AGENT_WORKDIR, _truncate
         progress_cb = ctx.get("progress_cb")
+        workspace = ctx.get("workspace")
         _subproc_env = ctx.get("subproc_env")
         proc = await asyncio.create_subprocess_exec(
             (sys.executable or "python"), "-I", "-c", content,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
             env=_subproc_env,
-            cwd=agent_cwd(),
+            cwd=workspace or _AGENT_WORKDIR,
         )
         stdout, stderr, rc, timed_out = await _run_subprocess_streaming(
             proc,

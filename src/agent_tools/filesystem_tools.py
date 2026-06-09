@@ -1,7 +1,6 @@
 import asyncio
 import json
 import os
-import re
 import difflib
 import fnmatch
 import shutil
@@ -16,31 +15,6 @@ _CODENAV_SKIP_DIRS = frozenset({
 })
 _CODENAV_MAX_HITS = 200
 _CODENAV_MAX_LINE = 400
-
-
-def _glob_to_regex(pat: str) -> "re.Pattern":
-    """Translate a forward-slash glob (**, *, ?) into a compiled regex.
-    `**/` matches zero or more complete directories.
-    `*` matches within a single path segment (does not cross /).
-    """
-    i, n, out = 0, len(pat), []
-    while i < n:
-        if pat[i : i + 3] == "**/":
-            out.append("(?:[^/]+/)*")
-            i += 3
-        elif pat[i : i + 2] == "**":
-            out.append(".*")
-            i += 2
-        elif pat[i] == "*":
-            out.append("[^/]*")
-            i += 1
-        elif pat[i] == "?":
-            out.append("[^/]")
-            i += 1
-        else:
-            out.append(re.escape(pat[i]))
-            i += 1
-    return re.compile("".join(out))
 
 def _unified_diff(old: str, new: str, path: str) -> Optional[Dict[str, Any]]:
     if old == new:
@@ -72,7 +46,13 @@ def _unified_diff(old: str, new: str, path: str) -> Optional[Dict[str, Any]]:
 
 class EditFileTool:
     async def execute(self, content: str, ctx: dict) -> dict:
-        from src.tool_execution import _resolve_tool_path, _resolve_search_root, _truncate
+        from src.tool_execution import (
+                    _resolve_tool_path,
+                    _resolve_tool_path_in_workspace,
+                    _resolve_search_root,
+                    _truncate
+                )
+        workspace = ctx.get("workspace")
         try:
             args = json.loads(content) if content.strip().startswith("{") else {}
         except (json.JSONDecodeError, TypeError):
@@ -84,7 +64,8 @@ class EditFileTool:
         if not raw_path:
             return {"error": "edit_file: path required", "exit_code": 1}
         try:
-            path = _resolve_tool_path(raw_path)
+            path = (_resolve_tool_path_in_workspace(workspace, raw_path)
+                    if workspace else _resolve_tool_path(raw_path))
         except ValueError as e:
             return {"error": f"edit_file: {e}", "exit_code": 1}
         if old == "":
@@ -132,7 +113,13 @@ class EditFileTool:
 
 class ReadFileTool:
     async def execute(self, content: str, ctx: dict) -> dict:
-        from src.tool_execution import _resolve_tool_path, _resolve_search_root, _truncate
+        from src.tool_execution import (
+                    _resolve_tool_path,
+                    _resolve_tool_path_in_workspace,
+                    _resolve_search_root,
+                    _truncate
+                )
+        workspace = ctx.get("workspace")
         raw_path, offset, limit = content.split("\n", 1)[0].strip(), 0, 0
         _stripped = content.strip()
         if _stripped.startswith("{"):
@@ -144,7 +131,8 @@ class ReadFileTool:
             except (json.JSONDecodeError, TypeError, ValueError):
                 pass
         try:
-            path = _resolve_tool_path(raw_path)
+            path = (_resolve_tool_path_in_workspace(workspace, raw_path)
+                    if workspace else _resolve_tool_path(raw_path))
         except ValueError as e:
             return {"error": f"read_file: {e}", "exit_code": 1}
         try:
@@ -182,27 +170,19 @@ class ReadFileTool:
 
 class WriteFileTool:
     async def execute(self, content: str, ctx: dict) -> dict:
-        from src.tool_execution import _resolve_tool_path, _resolve_search_root, _truncate
+        from src.tool_execution import (
+                    _resolve_tool_path,
+                    _resolve_tool_path_in_workspace,
+                    _resolve_search_root,
+                    _truncate
+                )
+        workspace = ctx.get("workspace")
         lines = content.split("\n", 1)
         raw_path = lines[0].strip()
         body = lines[1] if len(lines) > 1 else ""
-        # Decode JSON-object args (the fenced inline-args shape
-        # ```write_file {"path": "...", "content": "..."}```), matching
-        # ReadFileTool above. Without this the whole JSON string becomes the
-        # path and the file is written under a garbage name. This is the live
-        # path: there is no filesystem MCP server, so write_file always runs
-        # here via _direct_fallback, not through _build_mcp_args.
-        _stripped = content.strip()
-        if _stripped.startswith("{"):
-            try:
-                _a = json.loads(_stripped)
-                if isinstance(_a, dict) and "path" in _a:
-                    raw_path = str(_a.get("path", "")).strip()
-                    body = str(_a.get("content", ""))
-            except (json.JSONDecodeError, TypeError, ValueError):
-                pass
         try:
-            path = _resolve_tool_path(raw_path)
+            path = (_resolve_tool_path_in_workspace(workspace, raw_path)
+                    if workspace else _resolve_tool_path(raw_path))
         except ValueError as e:
             return {"error": f"write_file: {e}", "exit_code": 1}
         try:
@@ -232,7 +212,13 @@ class WriteFileTool:
 
 class LsTool:
     async def execute(self, content: str, ctx: dict) -> dict:
-        from src.tool_execution import _resolve_tool_path, _resolve_search_root, _truncate
+        from src.tool_execution import (
+                    _resolve_tool_path,
+                    _resolve_tool_path_in_workspace,
+                    _resolve_search_root,
+                    _truncate
+                )
+        workspace = ctx.get("workspace")
         raw_path = ""
         _s = (content or "").strip()
         if _s.startswith("{"):
@@ -282,12 +268,12 @@ class LsTool:
 class GlobTool:
     async def execute(self, content: str, ctx: dict) -> dict:
         from src.tool_execution import (
-            _SENSITIVE_BASENAMES,
-            _is_sensitive_path,
-            _resolve_tool_path,
-            _resolve_search_root,
-            _truncate,
-        )
+                    _resolve_tool_path,
+                    _resolve_tool_path_in_workspace,
+                    _resolve_search_root,
+                    _truncate
+                )
+        workspace = ctx.get("workspace")
         args = {}
         _s = (content or "").strip()
         if _s.startswith("{"):
@@ -306,67 +292,23 @@ class GlobTool:
             return {"error": f"glob: {e}", "exit_code": 1}
 
         def _glob():
-            base = os.path.abspath(root)
-            rbase = os.path.realpath(base)
-            if not os.path.isdir(base):
+            from pathlib import Path
+            base = Path(root)
+            if not base.is_dir():
                 return None, f"glob: {root}: not a directory"
-            rbase = os.path.realpath(base)
-            norm_pat = pattern.replace("\\", "/")
-            # Fast path: literal pattern (no wildcards) → direct path lookup.
-            if not any(c in norm_pat for c in "*?["):
-                cand = os.path.realpath(os.path.join(base, norm_pat))
-                # Keep the literal lookup inside the search root. os.path.join
-                # lets an absolute pattern (or one containing ../) escape `base`,
-                # which would turn glob into an existence/path oracle for
-                # arbitrary host files — bypassing the workspace/allowlist
-                # confinement that _resolve_search_root applies to the root.
-                # An escaping literal falls through to the walk, which only ever
-                # yields paths under base.
-                nbase = os.path.normcase(rbase)
-                try:
-                    inside = cand == rbase or os.path.commonpath(
-                        [os.path.normcase(cand), nbase]
-                    ) == nbase
-                except ValueError:
-                    inside = False
-                # A literal that names a deny-listed sensitive file (.env,
-                # .ssh/id_rsa, …) falls through to the walk, which skips it —
-                # otherwise glob would surface secret paths that read_file /
-                # grep already refuse to touch.
-                if inside and os.path.exists(cand) and not _is_sensitive_path(cand):
-                    return [cand], None
-                # Literal not at exact path — fall through to walk so
-                # e.g. "foo.py" still matches at any depth (like rglob).
-            # Compile glob to regex: * stays within one segment, **/ spans dirs.
-            regex = _glob_to_regex(norm_pat)
             matched = []
-            cap = _CODENAV_MAX_HITS * 5
             try:
-                for dp, dns, fns in os.walk(base):
-                    # Prune skipped dirs before descending (unlike rglob which
-                    # descends first then filters — fatal on large node_modules).
-                    # Sensitive dirs (.ssh, .gnupg, …) are pruned too so glob
-                    # never enumerates the keys/tokens inside them.
-                    dns[:] = [
-                        d for d in dns
-                        if d not in _CODENAV_SKIP_DIRS and d not in _SENSITIVE_BASENAMES
-                    ]
-                    for name in fns + dns:
-                        full = os.path.join(dp, name)
-                        rel = os.path.relpath(full, base).replace(os.sep, "/")
-                        if regex.fullmatch(rel) or regex.fullmatch(name):
-                            # Skip deny-listed sensitive files (.env, id_rsa,
-                            # known_hosts, …) the same way grep does.
-                            if _is_sensitive_path(os.path.realpath(full)):
-                                continue
-                            try:
-                                mtime = os.stat(full).st_mtime
-                            except OSError:
-                                mtime = 0
-                            matched.append((mtime, full))
-                    if len(matched) > cap:
+                for p in base.rglob(pattern):
+                    if set(p.relative_to(base).parts) & _CODENAV_SKIP_DIRS:
+                        continue
+                    try:
+                        mtime = p.stat().st_mtime
+                    except OSError:
+                        mtime = 0
+                    matched.append((mtime, str(p)))
+                    if len(matched) > _CODENAV_MAX_HITS * 5:
                         break
-            except OSError as _e:
+            except (OSError, ValueError) as _e:
                 return None, f"glob: {_e}"
             matched.sort(key=lambda t: t[0], reverse=True)
             return [pth for _, pth in matched[:_CODENAV_MAX_HITS]], None
@@ -384,12 +326,12 @@ class GlobTool:
 class GrepTool:
     async def execute(self, content: str, ctx: dict) -> dict:
         from src.tool_execution import (
-            _SENSITIVE_FILE_PATTERNS,
-            _is_sensitive_path,
-            _resolve_tool_path,
-            _resolve_search_root,
-            _truncate,
-        )
+                    _resolve_tool_path,
+                    _resolve_tool_path_in_workspace,
+                    _resolve_search_root,
+                    _truncate
+                )
+        workspace = ctx.get("workspace")
         args: Dict[str, Any] = {}
         _s = (content or "").strip()
         if _s.startswith("{"):
@@ -425,12 +367,6 @@ class GrepTool:
                     cmd.append("--ignore-case")
                 if glob_pat:
                     cmd += ["--glob", glob_pat]
-                # --iglob (not --glob) so the exclusion is case-insensitive:
-                # on a case-insensitive filesystem "ID_RSA"/"Known_Hosts"
-                # resolve to the same secret as their lowercase forms, and the
-                # Python fallback below already folds case via _is_sensitive_path.
-                for _pat in _SENSITIVE_FILE_PATTERNS:
-                    cmd += ["--iglob", f"!*{_pat}*"]
                 for _d in _CODENAV_SKIP_DIRS:
                     cmd += ["--glob", f"!**/{_d}/**"]
                 cmd += ["--regexp", pattern, root]
@@ -461,8 +397,6 @@ class GrepTool:
             for fp in file_iter:
                 if len(hits) >= max_hits:
                     break
-                if _is_sensitive_path(os.path.realpath(fp)):
-                    continue
                 try:
                     with open(fp, "r", encoding="utf-8", errors="strict") as f:
                         for i, line in enumerate(f, 1):
@@ -483,21 +417,3 @@ class GrepTool:
         if len(lines) >= max_hits:
             out += f"\n... [capped at {max_hits} matches]"
         return {"output": _truncate(out), "exit_code": 0}
-
-class GetWorkspaceTool:
-    """Report the active workspace folder (no args). File tools are confined to
-    it; the shell starts there (cwd) but is NOT sandboxed."""
-    async def execute(self, content: str, ctx: dict) -> dict:
-        from src.tool_execution import get_active_workspace
-        ws = get_active_workspace()
-        if ws:
-            return {
-                "output": f"{ws}\n(File tools are confined to this folder; the shell starts "
-                          f"here but is not sandboxed and can reach outside it.)",
-                "exit_code": 0,
-            }
-        return {
-            "output": "No workspace is set. File tools use the default allowed roots; "
-                      "resolve paths from the user or use absolute paths.",
-            "exit_code": 0,
-        }
