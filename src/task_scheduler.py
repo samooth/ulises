@@ -1613,6 +1613,8 @@ class TaskScheduler:
 
         endpoint_url = _normalize_chat_endpoint(endpoint_url)
 
+        endpoint_url = _normalize_chat_endpoint(endpoint_url)
+
         session_id = task.session_id
         if not session_id:
             session_id = str(uuid.uuid4())
