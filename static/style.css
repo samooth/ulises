@@ -23906,7 +23906,7 @@ details.hwfit-serve-advanced > .hwfit-serve-row {
 }
 details.hwfit-serve-advanced > .hwfit-serve-row.hwfit-backend-llamacpp,
 details.hwfit-serve-advanced > .hwfit-serve-checks.hwfit-backend-llamacpp {
-  margin-top: -8px;
+  margin-top: -12px;
 }
 details.hwfit-serve-advanced > .hwfit-diff-settings-row {
   row-gap: 2px;
