@@ -1,5 +1,5 @@
 /* ============================================ */
-/* Odysseus UI — Consolidated Stylesheet        */
+/* Ulises UI — Consolidated Stylesheet        */
 /* ============================================ */
 
 
@@ -21,7 +21,7 @@
   --fg: #9cdef2;
   --panel: #111;
   --border: #355a66;
-  --red: #e06c75;
+  --red: #6663F1;
   /* Were `var(--green)` / `var(--warn)` — self-referential, so they
      resolved to invalid and every site fell back to its own literal
      (or, for sites with no fallback, painted as transparent/inherit).
@@ -5858,7 +5858,7 @@ body.bg-pattern-sparkles {
     /* (legacy toolbar-toggle styles removed — now using .vis-* classes) */
 
     /* Demo highlight pulse */
-    .odysseus-highlight {
+    .ulises-highlight {
       outline: 2px solid var(--accent, var(--red)) !important;
       outline-offset: 1px;
       box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent, var(--red)) 18%, transparent);
@@ -5986,7 +5986,7 @@ body.bg-pattern-sparkles {
     @media (prefers-reduced-motion: reduce) {
       .th-cursor, .th-modal-group, .th-zone { animation: none !important; }
     }
-    .odysseus-hl-label {
+    .ulises-hl-label {
       position: absolute;
       top: -22px;
       left: 8px;
@@ -16317,8 +16317,8 @@ body:not(.email-doc-split-active) #email-lib-modal.email-lib-fullscreen:not(.mod
   color: var(--accent, var(--red));
 }
 .doclib-card-text-btn-danger {
-  color: var(--color-danger, #e06c75);
-  border-color: var(--color-danger, #e06c75);
+  color: var(--color-danger, #6663F1);
+  border-color: var(--color-danger, #6663F1);
 }
 .doclib-card-text-btn-danger:hover {
   color: #ff4d4d;
@@ -16534,8 +16534,8 @@ body:not(.email-doc-split-active) #email-lib-modal.email-lib-fullscreen:not(.mod
   border-color: var(--accent, var(--red));
 }
 .doclib-chat-delete-btn {
-  color: var(--color-danger, #e06c75);
-  border: 1px solid var(--color-danger, #e06c75);
+  color: var(--color-danger, #6663F1);
+  border: 1px solid var(--color-danger, #6663F1);
 }
 .doclib-chat-delete-btn:hover {
   color: #ff4d4d;
@@ -16843,21 +16843,21 @@ body:not(.email-doc-split-active) #email-lib-modal.email-lib-fullscreen:not(.mod
   color: var(--color-warning, #f0ad4e);
 }
 .skill-necessity-trivial {
-  background: color-mix(in srgb, var(--color-danger, #e06c75) 26%, transparent);
-  color: var(--color-danger, #e06c75);
-  border-color: color-mix(in srgb, var(--color-danger, #e06c75) 38%, transparent);
+  background: color-mix(in srgb, var(--color-danger, #6663F1) 26%, transparent);
+  color: var(--color-danger, #6663F1);
+  border-color: color-mix(in srgb, var(--color-danger, #6663F1) 38%, transparent);
 }
 .skill-necessity-irrelevant {
-  background: color-mix(in srgb, var(--color-danger, #e06c75) 18%, transparent);
-  color: var(--color-danger, #e06c75);
+  background: color-mix(in srgb, var(--color-danger, #6663F1) 18%, transparent);
+  color: var(--color-danger, #6663F1);
 }
 .skill-duplicate-keep {
   background: color-mix(in srgb, var(--color-success, #4ade80) 22%, transparent);
   color: var(--color-success, #4ade80);
 }
 .skill-duplicate-lower {
-  background: color-mix(in srgb, var(--color-danger, #e06c75) 14%, transparent);
-  color: var(--color-danger, #e06c75);
+  background: color-mix(in srgb, var(--color-danger, #6663F1) 14%, transparent);
+  color: var(--color-danger, #6663F1);
 }
 .skill-stats {
   font-size: 9px;
@@ -16876,7 +16876,7 @@ body:not(.email-doc-split-active) #email-lib-modal.email-lib-fullscreen:not(.mod
 }
 .skill-verified { color: var(--accent, #4ade80); }
 .skill-teachermark { color: var(--color-warning, #f0ad4e); }
-.skill-needsmark { color: var(--color-danger, #e06c75); cursor: help; }
+.skill-needsmark { color: var(--color-danger, #6663F1); cursor: help; }
 
 /* The card currently being processed by an "Audit now" run glows + pulses so
    it's obvious which one the audit is on. */
@@ -17084,7 +17084,7 @@ body:not(.email-doc-split-active) #email-lib-modal.email-lib-fullscreen:not(.mod
 .skill-test-tool  { color: var(--accent, var(--red)); opacity: 0.85; }
 .skill-test-out   { opacity: 0.7; padding-left: 10px; }
 .skill-test-say   { white-space: pre-wrap; }
-.skill-test-err   { color: var(--color-danger, #e06c75); }
+.skill-test-err   { color: var(--color-danger, #6663F1); }
 .skill-eval-head  { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .skill-eval-badge {
   font-size: 10px; font-weight: 700; letter-spacing: 0.03em;
@@ -17092,7 +17092,7 @@ body:not(.email-doc-split-active) #email-lib-modal.email-lib-fullscreen:not(.mod
 }
 .skill-eval-ok   { background: color-mix(in srgb, var(--color-success, #4ade80) 26%, transparent); color: var(--color-success, #4ade80); }
 .skill-eval-warn { background: color-mix(in srgb, var(--color-warning, #f0ad4e) 26%, transparent); color: var(--color-warning, #f0ad4e); }
-.skill-eval-bad  { background: color-mix(in srgb, var(--color-danger, #e06c75) 26%, transparent); color: var(--color-danger, #e06c75); }
+.skill-eval-bad  { background: color-mix(in srgb, var(--color-danger, #6663F1) 26%, transparent); color: var(--color-danger, #6663F1); }
 .skill-eval-unknown { background: color-mix(in srgb, var(--fg) 14%, transparent); }
 .skill-eval-summary { font-size: 11px; opacity: 0.85; }
 .skill-eval-issues { margin: 6px 0 0; padding-left: 18px; font-size: 11px; opacity: 0.8; }
@@ -21709,10 +21709,10 @@ body.gallery-selecting .gallery-dl-btn,
   animation: cookbook-srv-glow-ok 2.4s ease-in-out infinite;
 }
 .cookbook-srv-status.fail {
-  background: var(--red, #e06c75);
+  background: var(--red, #6663F1);
   box-shadow:
-    0 0 0 2px color-mix(in srgb, var(--red, #e06c75) 25%, transparent),
-    0 0 10px 2px color-mix(in srgb, var(--red, #e06c75) 55%, transparent);
+    0 0 0 2px color-mix(in srgb, var(--red, #6663F1) 25%, transparent),
+    0 0 10px 2px color-mix(in srgb, var(--red, #6663F1) 55%, transparent);
 }
 @keyframes cookbook-srv-pulse {
   0%, 100% { opacity: 0.45; }
@@ -22703,7 +22703,7 @@ body.gallery-selecting .gallery-dl-btn,
 
 /* Welcome name — left-to-right wipe with a touch of horizontal stretch.
    Fires on initial render via the .welcome-name rule; restarts on Nobody⇄
-   Odysseus toggle via JS reflow trick. */
+   Ulises toggle via JS reflow trick. */
 .welcome-name {
   transform-origin: left center;
   animation: welcome-name-reveal 0.55s cubic-bezier(0.34, 1.32, 0.55, 1) both;
@@ -30454,7 +30454,7 @@ body.doc-find-active mark.doc-find-mark.current {
 .email-tag-marketing { background: rgba(244, 114, 182, 0.22); color: #f472b6; }
 .email-tag-notification { background: rgba(148, 163, 184, 0.22); color: #94a3b8; }
 .email-tag-security { background: rgba(248, 113, 113, 0.22); color: #f87171; }
-.email-tag-urgent { background: color-mix(in srgb, var(--color-error, #e06c75) 25%, transparent); color: var(--color-error, #e06c75); font-weight: 600; }
+.email-tag-urgent { background: color-mix(in srgb, var(--color-error, #6663F1) 25%, transparent); color: var(--color-error, #6663F1); font-weight: 600; }
 .email-tag-reply-soon { background: rgba(240, 173, 78, 0.22); color: #f0ad4e; }
 .email-tag-social { background: rgba(56, 189, 248, 0.22); color: #38bdf8; }
 .email-tag-shopping { background: rgba(236, 72, 153, 0.22); color: #ec4899; }
@@ -30646,11 +30646,11 @@ body.doc-find-active mark.doc-find-mark.current {
 }
 /* Launch-command Copy button morphs into Cancel once Launch has been clicked. */
 .hwfit-serve-copy.hwfit-serve-cancel {
-  border-color: var(--color-danger, #e06c75) !important;
-  color: var(--color-danger, #e06c75) !important;
+  border-color: var(--color-danger, #6663F1) !important;
+  color: var(--color-danger, #6663F1) !important;
 }
 .hwfit-serve-copy.hwfit-serve-cancel:hover {
-  background: color-mix(in srgb, var(--color-danger, #e06c75) 14%, transparent);
+  background: color-mix(in srgb, var(--color-danger, #6663F1) 14%, transparent);
 }
 /* Email modal title unread badge — small accent pill next to "Email". */
 .email-lib-unread-badge {
@@ -37245,7 +37245,7 @@ input.cp-swatch-input::selection { background: transparent; }
   font-family: ui-monospace, 'Fira Code', monospace;
   font-size: 12px; text-transform: lowercase;
 }
-.cp-hex:focus { outline: none; border-color: var(--red, #e06c75); }
+.cp-hex:focus { outline: none; border-color: var(--red, #6663F1); }
 .cp-eyedropper {
   width: 26px; height: 26px;
   padding: 0;
@@ -38267,7 +38267,7 @@ body.theme-frosted .modal {
   color: var(--warn, #f0ad4e);
 }
 .log-line-error {
-  color: var(--red, #e06c75);
+  color: var(--red, #6663F1);
 }
 .log-line-debug {
   color: var(--color-muted, #888);

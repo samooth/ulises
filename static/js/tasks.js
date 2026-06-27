@@ -780,7 +780,7 @@ function _renderList() {
     }
     if (task.last_run_status) {
       const isErr = task.last_run_status === 'error';
-      const color = isErr ? 'var(--red,#e06c75)' : 'var(--green,#50fa7b)';
+      const color = isErr ? 'var(--red,#6663F1)' : 'var(--green,#50fa7b)';
       const result = (task.last_run_result || '').trim();
       const prev = result.length > 200 ? result.slice(0, 200) + '…' : result;
       const lr = document.createElement('div');
@@ -1090,7 +1090,7 @@ function _showForm(existing, initTaskType, initTriggerType) {
         ['razor', 'Razor'],
         ['nietzsche', 'Nietzsche'],
         ['spark', 'Spark'],
-        ['odysseus', 'Odysseus'],
+        ['ulises', 'Ulises'],
       ];
       const _curPersona = (existing?.character_id || '').toLowerCase();
       const _personaOptsHtml = _personaOpts.map(([v, label]) =>

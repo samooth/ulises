@@ -93,7 +93,7 @@ import * as Modals from './modalManager.js';
   }
 
   async function _resolveComposeSendAccountId() {
-    const activeAccountId = window.__odysseusActiveEmailAccount || null;
+    const activeAccountId = window.__ulisesActiveEmailAccount || null;
     if (!activeAccountId) return null;
     const accounts = await _getEmailAccountsCached();
     const activeAccount = accounts.find(a => String(a.id) === String(activeAccountId));
@@ -106,7 +106,7 @@ import * as Modals from './modalManager.js';
   {
     const s = document.createElement('style');
     s.id = 'doc-tab-menu-styles';
-    s.textContent = `.doc-tab-menu-btn{background:none!important;border:none!important;outline:none!important;box-shadow:none!important;color:var(--fg);opacity:0.25;cursor:pointer;padding:2px 4px!important;height:auto!important;line-height:1;transition:opacity .15s;flex-shrink:0;-webkit-appearance:none;appearance:none}.doc-tab-menu-btn:focus,.doc-tab-menu-btn:active{outline:none!important;box-shadow:none!important;background:none!important}.doc-tab:hover .doc-tab-menu-btn{opacity:.5}.doc-tab-menu-btn:hover{opacity:1!important}.doc-tab-dropdown .dropdown-item-compact{padding:6px 8px;border-radius:6px;cursor:pointer;white-space:nowrap;border-bottom:none;display:flex;align-items:center;gap:10px;font-size:11px}.doc-tab-dropdown .dropdown-item-compact:hover{background:color-mix(in srgb,var(--fg) 8%,transparent)}.doc-tab-dropdown .dropdown-item-compact .dropdown-icon{width:14px;height:14px;display:flex;align-items:center;justify-content:center;flex-shrink:0;opacity:0.5}.doc-tab-dropdown .dropdown-divider{height:1px;margin:3px 0;background:color-mix(in srgb,var(--border) 40%,transparent)}.doc-tab-action-delete{color:var(--red,#e06c75)!important}.doc-tab-action-delete .dropdown-icon{opacity:0.7!important}`;
+    s.textContent = `.doc-tab-menu-btn{background:none!important;border:none!important;outline:none!important;box-shadow:none!important;color:var(--fg);opacity:0.25;cursor:pointer;padding:2px 4px!important;height:auto!important;line-height:1;transition:opacity .15s;flex-shrink:0;-webkit-appearance:none;appearance:none}.doc-tab-menu-btn:focus,.doc-tab-menu-btn:active{outline:none!important;box-shadow:none!important;background:none!important}.doc-tab:hover .doc-tab-menu-btn{opacity:.5}.doc-tab-menu-btn:hover{opacity:1!important}.doc-tab-dropdown .dropdown-item-compact{padding:6px 8px;border-radius:6px;cursor:pointer;white-space:nowrap;border-bottom:none;display:flex;align-items:center;gap:10px;font-size:11px}.doc-tab-dropdown .dropdown-item-compact:hover{background:color-mix(in srgb,var(--fg) 8%,transparent)}.doc-tab-dropdown .dropdown-item-compact .dropdown-icon{width:14px;height:14px;display:flex;align-items:center;justify-content:center;flex-shrink:0;opacity:0.5}.doc-tab-dropdown .dropdown-divider{height:1px;margin:3px 0;background:color-mix(in srgb,var(--border) 40%,transparent)}.doc-tab-action-delete{color:var(--red,#6663F1)!important}.doc-tab-action-delete .dropdown-icon{opacity:0.7!important}`;
     document.head.appendChild(s);
   }
 
@@ -115,8 +115,8 @@ import * as Modals from './modalManager.js';
   let _lastSessionId = '';          // session context for "+" button
   const docs = new Map();           // docId -> { id, title, language, content, version, sessionId }
 
-  const _docOpenKey = (sessionId) => 'odysseus-doc-open-' + sessionId;
-  const _docMinimizedKey = (sessionId) => 'odysseus-doc-minimized-' + sessionId;
+  const _docOpenKey = (sessionId) => 'ulises-doc-open-' + sessionId;
+  const _docMinimizedKey = (sessionId) => 'ulises-doc-minimized-' + sessionId;
 
   function _markDocVisibleState(sessionId, state) {
     if (!sessionId) return;
@@ -3235,7 +3235,7 @@ import * as Modals from './modalManager.js';
           body_html: bodyHtml,
           in_reply_to: inReplyTo || null,
           references: references || null,
-          account_id: window.__odysseusActiveEmailAccount || null,
+          account_id: window.__ulisesActiveEmailAccount || null,
         }),
       });
       const data = await res.json();
@@ -4828,7 +4828,7 @@ import * as Modals from './modalManager.js';
     const editorWrap = document.getElementById('doc-editor-wrap');
     const _fontSizes = ['s', 'm', 'l'];
     const _iconSizes = [12, 14, 16];
-    let _fontIdx = parseInt(localStorage.getItem('odysseus-doc-fontsize') || '0', 10);
+    let _fontIdx = parseInt(localStorage.getItem('ulises-doc-fontsize') || '0', 10);
     if (!(_fontIdx >= 0 && _fontIdx < 3)) _fontIdx = 0;
     function _applyDocFont() {
       const richEmailBody = document.getElementById('doc-email-richbody');
@@ -4848,7 +4848,7 @@ import * as Modals from './modalManager.js';
           el.style.display = active ? '' : 'none';
         });
       }
-      localStorage.setItem('odysseus-doc-fontsize', _fontIdx);
+      localStorage.setItem('ulises-doc-fontsize', _fontIdx);
     }
     _applyDocFont();
     // Click cycles through the sizes (S → M → L → S).
@@ -5780,7 +5780,7 @@ import * as Modals from './modalManager.js';
   }
 
   /** Collapse action buttons into overflow "..." menu (3 most-used visible) */
-  const _DOC_RECENTS_KEY = 'odysseus-doc-actions-recent';
+  const _DOC_RECENTS_KEY = 'ulises-doc-actions-recent';
   const _DOC_MAX_VISIBLE = 2;
 
   function _getDocRecent() {
@@ -7248,16 +7248,16 @@ import * as Modals from './modalManager.js';
     if (!activeDocId) return;
     const data = _activeSuggestions.map(s => ({ id: s.id, find: s.find, replace: s.replace, reason: s.reason }));
     if (data.length) {
-      localStorage.setItem('odysseus-suggestions-' + activeDocId, JSON.stringify(data));
+      localStorage.setItem('ulises-suggestions-' + activeDocId, JSON.stringify(data));
     } else {
-      localStorage.removeItem('odysseus-suggestions-' + activeDocId);
+      localStorage.removeItem('ulises-suggestions-' + activeDocId);
     }
   }
 
   /** Restore suggestions from localStorage for a doc */
   function _restoreSuggestionsFromStorage(docId) {
     try {
-      const raw = localStorage.getItem('odysseus-suggestions-' + docId);
+      const raw = localStorage.getItem('ulises-suggestions-' + docId);
       if (!raw) return;
       const data = JSON.parse(raw);
       if (!Array.isArray(data) || !data.length) return;

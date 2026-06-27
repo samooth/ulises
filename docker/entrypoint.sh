@@ -18,16 +18,16 @@ PYTHON_BIN="$(command -v python)"
 
 # Reuse an existing matching group/user if the host's UID/GID already
 # corresponds to one in /etc/passwd (e.g. when the image is rebuilt
-# and "odysseus" already exists at the same id). Otherwise create.
+# and "ulises" already exists at the same id). Otherwise create.
 if ! getent group "$PGID" >/dev/null 2>&1; then
-    groupadd -g "$PGID" odysseus
+    groupadd -g "$PGID" ulises
 fi
 if ! getent passwd "$PUID" >/dev/null 2>&1; then
-    useradd -u "$PUID" -g "$PGID" -M -s /bin/sh -d /app odysseus
+    useradd -u "$PUID" -g "$PGID" -M -s /bin/sh -d /app ulises
 fi
 
 ODY_USER="$(getent passwd "$PUID" | cut -d: -f1)"
-[ -z "$ODY_USER" ] && ODY_USER=odysseus
+[ -z "$ODY_USER" ] && ODY_USER=ulises
 
 # Docker-socket group plumbing. When /var/run/docker.sock is bind-mounted
 # (Cookbook uses docker exec to reach sibling containers), the socket is
