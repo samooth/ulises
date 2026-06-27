@@ -122,6 +122,7 @@ _GEMMA_TOOL_CALL_RE = re.compile(
 
 
 
+
 # Pattern 5: DeepSeek DSML markup leaking into content. When deepseek
 # models can't emit structured tool_calls (e.g. we sent no tool schemas
 # that round, or the API didn't parse them), they fall back to raw
@@ -942,6 +943,52 @@ def _iter_xml_direct(text):
     """Forward-only equivalent of ``_XML_DIRECT_TOOL_RE.finditer`` (see
     _iter_backref_blocks)."""
     return _iter_backref_blocks(text, _XML_DIRECT_OPEN_RE, _XML_DIRECT_CLOSE_ANY_RE, ci=True)
+
+
+def _iter_delimited(text, open_re, close_re):
+    """Yield ``(match_start, inner_start, inner_end, match_end)`` for each
+    non-overlapping ``open_re ... close_re`` pair, scanning strictly forward.
+
+    For the lazy, non-nesting delimiters here this is equivalent to
+    ``re.finditer`` of ``open_re([\\s\\S]*?)close_re`` (each opener pairs with
+    the first closer after it; the next scan resumes past that closer), but it
+    runs in O(n): the moment an opener has no reachable closer, no later opener
+    can have one either, so we stop. ``re.finditer`` instead retries from every
+    opener and rescans to end-of-string each time -> O(n^2) on attacker-
+    controlled "many openers, no closer" model output (CodeQL py/polynomial-redos).
+
+    A whole-string "is the closer present?" guard is not enough: a stale closer
+    placed before an opener flood, or a closer with no matching inner delimiter
+    (e.g. `[/TOOL_CALL]` but no `}`), keeps the guard true while every opener
+    still rescans. Pairing each opener only with a closer *after* it closes both
+    holes.
+    """
+    pos = 0
+    while True:
+        om = open_re.search(text, pos)
+        if om is None:
+            return
+        cm = close_re.search(text, om.end())
+        if cm is None:
+            return
+        yield om.start(), om.end(), cm.start(), cm.end()
+        pos = cm.end()
+
+
+def _strip_delimited(text: str, open_re, close_re) -> str:
+    """Remove every ``open_re ... close_re`` span (forward-only; see
+    _iter_delimited). Equivalent to ``open_re([\\s\\S]*?)close_re`` ``re.sub('')``
+    for these delimiters, without the O(n^2) rescan on unclosed openers."""
+    spans = list(_iter_delimited(text, open_re, close_re))
+    if not spans:
+        return text
+    out = []
+    last = 0
+    for match_start, _inner_start, _inner_end, match_end in spans:
+        out.append(text[last:match_start])
+        last = match_end
+    out.append(text[last:])
+    return "".join(out)
 
 
 def parse_tool_blocks(text: str, skip_fenced: bool = False) -> List[ToolBlock]:
