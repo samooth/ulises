@@ -3703,6 +3703,23 @@ export async function _fetchCachedModels() {
     if (host) { qp.set('host', host); const _sp4 = _getPort(host); if (_sp4) qp.set('ssh_port', _sp4); const _plat = _getPlatform(host); if (_plat) qp.set('platform', _plat); }
     if (modelDirs.length) qp.set('model_dir', modelDirs.join(','));
     const params = qp.toString() ? `?${qp}` : '';
+    const scanSig = params || 'local';
+    const cached = fresh ? null : _readCachedModelScan(scanSig);
+    if (cached) {
+      _dlWp.destroy();
+      _renderCachedModelsData(list, cached, host);
+      return;
+    }
+    if (!allowNetwork) {
+      _dlWp.destroy();
+      list.innerHTML = '<div class="hwfit-loading" style="flex-direction:column;gap:8px;text-align:center;"><div>No cached model scan yet</div><div style="font-size:11px;opacity:0.55;max-width:420px;line-height:1.4;">Check this server\'s model cache.</div><button type="button" class="hwfit-gpu-btn serve-empty-scan-btn" style="height:26px;padding:3px 10px;">Scan</button></div>';
+      list.querySelector('.serve-empty-scan-btn')?.addEventListener('click', () => {
+        _fetchCachedModels(true);
+      });
+      const tagContainer = document.getElementById('serve-tags');
+      if (tagContainer) tagContainer.innerHTML = '';
+      return;
+    }
     const res = await fetch(`/api/model/cached${params}`);
     if (!res.ok) {
       const body = await res.text().catch(() => '');
