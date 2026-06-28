@@ -223,8 +223,8 @@ def _resolve_task_timezone(db, task) -> str | None:
         cm = db.query(CrewMember).filter(CrewMember.id == task.crew_member_id).first()
         if cm and cm.timezone:
             return cm.timezone
-    except Exception:
-        pass
+    except Exception as e:
+        logger.debug("CrewMember timezone lookup failed: %s", e)
     return None
 
 
@@ -925,8 +925,8 @@ class TaskScheduler:
             try:
                 _t = db.query(ScheduledTask).filter(ScheduledTask.id == task_id).first()
                 _owner = _t.owner if _t else None
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug("ScheduledTask owner lookup failed: %s", e)
             _should_notify_error = False
             try:
                 _t_for_notify = db.query(ScheduledTask).filter(ScheduledTask.id == task_id).first()
@@ -960,8 +960,8 @@ class TaskScheduler:
                             cron_expression=task_obj.cron_expression,
                             tz_name=_resolve_task_timezone(db, task_obj),
                         )
-                    except Exception:
-                        pass
+                    except Exception as e:
+                        logger.debug("compute_next_run failed: %s", e)
                 try:
                     db.commit()
                 except Exception as commit_err:
@@ -1306,8 +1306,8 @@ class TaskScheduler:
                         content = result.get("stdout") or result.get("output") or ""
                         if content.strip():
                             raw[label] = content[:3000]
-                    except Exception:
-                        pass
+                    except Exception as e:
+                        logger.debug("MCP tool call result failed: %s", e)
 
         # Build the data dump and hand it to the LLM
         data_dump = f"Current time: {time_str}\n\n"
@@ -1385,8 +1385,8 @@ class TaskScheduler:
                         session_id, f"[Task] {task.name}", endpoint_url, model,
                         owner=task.owner, task=task
                     )
-                except Exception:
-                    pass
+                except Exception as e:
+                    logger.debug("ensure_task_session failed: %s", e)
 
         # For assistant check-ins: call each tool directly and post results
         # as separate messages. More reliable than hoping the model calls tools.
@@ -1411,8 +1411,8 @@ class TaskScheduler:
                 char_prompt = _PERSONAS.get(char_id.lower())
                 if char_prompt:
                     system_prompt = f"{char_prompt}\n\n{system_prompt}"
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug("persona injection failed: %s", e)
         # Inject current time so the model knows what's past vs upcoming
         tz_name = _resolve_task_timezone(db, task)
         try:
@@ -1442,15 +1442,15 @@ class TaskScheduler:
                     from src.tool_index import BUILTIN_TOOL_DESCRIPTIONS
                     all_tools = set(BUILTIN_TOOL_DESCRIPTIONS.keys())
                     disabled_tools |= all_tools - set(enabled)
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug("enabled_tools JSON parse failed: %s", e)
         try:
             from src.settings import get_setting
             _global_disabled = get_setting("disabled_tools", [])
             if isinstance(_global_disabled, list):
                 disabled_tools.update(_global_disabled)
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug("disabled_tools setting fetch failed: %s", e)
 
         # RAG-select relevant tools for this prompt + always-available assistant tools.
         # Without this, all 40+ tools get sent and models hit their tool limit.
@@ -1496,8 +1496,8 @@ class TaskScheduler:
         try:
             from src.text_helpers import strip_think
             result = strip_think(result or "", prose=True, prompt_echo=True).strip() or result
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug("strip_think failed: %s", e)
 
         return result
 
@@ -1545,8 +1545,8 @@ class TaskScheduler:
                 resolved_url, resolved_model = self._resolve_defaults(db, task.owner)
                 endpoint_url = endpoint_url or resolved_url
                 model_name = model_name or resolved_model
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug("_resolve_defaults failed: %s", e)
 
         session_id = task.session_id
         if not session_id:
@@ -1570,8 +1570,8 @@ class TaskScheduler:
                         session_id, f"[Task] {task.name}", endpoint_url, model_name,
                         owner=task.owner, task=task
                     )
-                except Exception:
-                    pass
+                except Exception as e:
+                    logger.debug("ensure_task_session failed: %s", e)
 
         meta = {}
         if model_name:
@@ -1704,8 +1704,8 @@ class TaskScheduler:
                         break
             finally:
                 db2.close()
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug("ModelEndpoint header resolution failed: %s", e)
         full_text = ""
         tool_results = []
 
@@ -1814,8 +1814,8 @@ class TaskScheduler:
                 if ep_headers is not None:
                     headers = ep_headers
                     headers_from_resolver = True
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug("resolve_endpoint failed: %s", e)
 
         if not endpoint_url or not model:
             endpoint_url, model = self._resolve_defaults(db, task.owner)
@@ -1838,8 +1838,8 @@ class TaskScheduler:
                     if normalize_base(ep.base_url) in endpoint_url or endpoint_url in normalize_base(ep.base_url):
                         headers = build_headers(ep.api_key, normalize_base(ep.base_url))
                         break
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug("ModelEndpoint header resolution failed: %s", e)
 
         max_tokens = int(get_setting("research_max_tokens", 8192))
         extraction_timeout = int(get_setting("research_extraction_timeout_seconds", 90) or 90)
@@ -1884,8 +1884,8 @@ class TaskScheduler:
             if self._session_manager:
                 try:
                     self._session_manager.sessions[session_id] = self._session_manager._db_to_session(sess)
-                except Exception:
-                    pass
+                except Exception as e:
+                    logger.debug("_db_to_session conversion failed: %s", e)
 
         # Persist scheduled research in the same on-disk shape used by the
         # Research panel. Without this, task research had Markdown output but
@@ -1957,8 +1957,8 @@ class TaskScheduler:
             ).order_by(DbSession.created_at.desc()).first()
             if recent:
                 return recent.endpoint_url, recent.model
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug("DbSession endpoint probe failed: %s", e)
         return None, None
 
     async def _deliver_via_mcp(self, tool_name: str, task, result: str):
@@ -2116,8 +2116,8 @@ class TaskScheduler:
                 live_ids = {row[0] for row in db.query(ScheduledTask.id).all()}
                 if live_ids:
                     db.query(TaskRun).filter(~TaskRun.task_id.in_(list(live_ids))).delete(synchronize_session=False)
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug("stale TaskRun cleanup failed: %s", e)
             existing_actions = {
                 row[0] for row in db.query(ScheduledTask.action).filter(
                     ScheduledTask.owner == owner,

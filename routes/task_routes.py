@@ -361,7 +361,7 @@ def setup_task_routes(task_scheduler) -> APIRouter:
                 q = q.filter(ScheduledTask.owner == user)
             if status:
                 q = q.filter(ScheduledTask.status == status)
-            tasks = q.order_by(ScheduledTask.created_at.desc()).all()
+            tasks = q.order_by(ScheduledTask.created_at.desc()).limit(500).all()
             return {"tasks": [_task_to_dict(t, include_last_run_result=include_last_run) for t in tasks]}
         finally:
             db.close()

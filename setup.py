@@ -5,8 +5,10 @@ Creates data directories, initializes the database, and sets up an
 initial admin user. Safe to re-run (skips what already exists).
 """
 
+import importlib
 import os
 import platform
+import secrets
 import shutil
 import subprocess
 import sys
@@ -115,7 +117,7 @@ def create_default_admin():
         else:
             # Non-interactive (Docker, CI) — fall back to generated password
             username = username or "admin"
-            password = password or __import__("secrets").token_urlsafe(18)
+            password = password or secrets.token_urlsafe(18)
 
         username = username or "admin"
         hashed = bcrypt.hashpw(password.encode(), bcrypt.gensalt()).decode()
@@ -174,7 +176,7 @@ def check_deps():
     missing = []
     for mod in ["fastapi", "uvicorn", "sqlalchemy", "bcrypt", "httpx", "dotenv"]:
         try:
-            __import__(mod)
+            importlib.import_module(mod)
         except ImportError:
             missing.append(mod)
     if missing:

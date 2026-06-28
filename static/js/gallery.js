@@ -6,8 +6,7 @@ import uiModule from './ui.js';
 import { openEditor, closeEditor, isEditorOpen } from './galleryEditor.js';
 import spinnerModule from './spinner.js';
 import { makeWindowDraggable } from './windowDrag.js';
-
-const API_BASE = window.location.origin;
+import { API_BASE } from './apiBase.js';
 let _open = false;
 let _galleryResizeHandler = null;
 

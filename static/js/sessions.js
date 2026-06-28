@@ -9,8 +9,7 @@ import { providerLogo } from './providers.js';
 import { initModelPicker, updateModelPicker } from './modelPicker.js';
 import themeModule from './theme.js';
 import spinnerModule from './spinner.js';
-
-const API_BASE = window.location.origin;
+import { API_BASE } from './apiBase.js';
 
 let sessions = [];
 let currentSessionId = null;

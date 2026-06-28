@@ -399,7 +399,7 @@ def setup_document_routes(session_manager, upload_handler=None) -> APIRouter:
             )
             if user:
                 q = q.filter(or_(Document.owner == user, Document.owner.is_(None)))
-            docs = q.order_by(Document.created_at.desc()).all()
+            docs = q.order_by(Document.created_at.desc()).limit(500).all()
             return [_doc_to_dict(d) for d in docs]
         finally:
             db.close()
@@ -482,7 +482,7 @@ def setup_document_routes(session_manager, upload_handler=None) -> APIRouter:
             doc.current_content = head + body_text.strip() + "\n"
             doc.version_count = (doc.version_count or 1) + 1
             db.add(DocumentVersion(
-                id=str(__import__("uuid").uuid4()),
+                id=str(uuid.uuid4()),
                 document_id=doc_id,
                 version_number=doc.version_count,
                 content=doc.current_content,
@@ -700,7 +700,7 @@ def setup_document_routes(session_manager, upload_handler=None) -> APIRouter:
             _verify_doc_owner(db, doc, user)
             versions = db.query(DocumentVersion).filter(
                 DocumentVersion.document_id == doc_id
-            ).order_by(DocumentVersion.version_number.desc()).all()
+            ).order_by(DocumentVersion.version_number.desc()).limit(500).all()
             return [{
                 "id": v.id,
                 "version_number": v.version_number,
@@ -788,7 +788,7 @@ def setup_document_routes(session_manager, upload_handler=None) -> APIRouter:
                 .filter((Document.archived == False) | (Document.archived.is_(None)))
             )
             q = _owner_session_filter(q, user)
-            docs = q.all()
+            docs = q.limit(1000).all()
             fixed_titles = 0
             deleted = 0
 
@@ -859,7 +859,7 @@ def setup_document_routes(session_manager, upload_handler=None) -> APIRouter:
                 .filter((Document.current_content == None) | (Document.current_content == ""))
             )
             inactive_q = _owner_session_filter(inactive_q, user)
-            inactive_docs = inactive_q.all()
+            inactive_docs = inactive_q.limit(1000).all()
             for doc in inactive_docs:
                 db.delete(doc)
             deleted += len(inactive_docs)
@@ -903,7 +903,7 @@ def setup_document_routes(session_manager, upload_handler=None) -> APIRouter:
                 .filter((Document.archived == False) | (Document.archived.is_(None)))
             )
             q = _owner_session_filter(q, user)
-            docs = q.all()
+            docs = q.limit(500).all()
 
             # Only review docs that haven't been reviewed yet
             to_review = [d for d in docs if not d.tidy_verdict]

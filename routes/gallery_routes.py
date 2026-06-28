@@ -603,7 +603,7 @@ def setup_gallery_routes() -> APIRouter:
         try:
             q = db.query(GalleryAlbum)
             q = _owner_filter(q, user, GalleryAlbum)
-            albums = q.order_by(GalleryAlbum.created_at.desc()).all()
+            albums = q.order_by(GalleryAlbum.created_at.desc()).limit(500).all()
             result = []
             for a in albums:
                 _count_q = db.query(GalleryImage).filter(

@@ -61,7 +61,8 @@ def _get_cache_key(url: str, model: str, messages: List[Dict],
     }, sort_keys=True)
     return hashlib.sha256(content.encode()).hexdigest()
 
-_response_cache = {}
+_response_cache: Dict[str, str] = {}
+_response_cache_lock = threading.Lock()
 
 # Dead-host cooldown: maps host (scheme://host:port) -> unix ts when cooldown expires.
 # When a connect to a host fails, we mark it dead for DEAD_HOST_COOLDOWN seconds so
@@ -193,7 +194,7 @@ def _model_activity_key(url: str, model: str) -> str:
 def _same_model_identity(left: str, right: str) -> bool:
     return (left or "").strip().lower() == (right or "").strip().lower()
 
-def note_model_activity(url: str, model: str):
+def note_model_activity(url: str, model: str) -> None:
     """Record that a real upstream request used this endpoint/model."""
     if not url or not model:
         return
@@ -261,18 +262,17 @@ def _get_http_client() -> httpx.AsyncClient:
 
 def _get_cached_response(cache_key: str) -> Optional[str]:
     """Get cached response if it exists."""
-    return _response_cache.get(cache_key)
+    with _response_cache_lock:
+        return _response_cache.get(cache_key)
 
 def _set_cached_response(cache_key: str, response: str) -> None:
     """Store response in cache."""
-    if len(_response_cache) > 128:
-        keys_to_remove = list(_response_cache.keys())[:64]
-        for key in keys_to_remove:
-            # pop(), not del: another thread (sync llm_call runs in FastAPI's
-            # threadpool) may have already evicted the same snapshotted key,
-            # and del would raise KeyError mid-eviction (issue #659).
-            _response_cache.pop(key, None)
-    _response_cache[cache_key] = response
+    with _response_cache_lock:
+        if len(_response_cache) > 128:
+            keys_to_remove = list(_response_cache.keys())[:64]
+            for key in keys_to_remove:
+                _response_cache.pop(key, None)
+        _response_cache[cache_key] = response
 
 # ── Anthropic native API adapter ──
 
@@ -1787,12 +1787,12 @@ async def stream_llm(url: str, model: str, messages: List[Dict], temperature: fl
         try:
             client = _get_http_client()
             async with client.stream('POST', target_url, json=payload, headers=h, timeout=stream_timeout) as r:
-                _clear_host_dead(target_url)
                 if r.status_code != 200:
                     raw = (await r.aread()).decode(errors="replace")
                     friendly = _format_chatgpt_subscription_error(r.status_code, raw)
                     yield f'event: error\ndata: {json.dumps({"status": r.status_code, "text": friendly, "raw": raw[:500]})}\n\n'
                     return
+                _clear_host_dead(target_url)
                 async for line in r.aiter_lines():
                     if not line:
                         continue
@@ -1848,12 +1848,12 @@ async def stream_llm(url: str, model: str, messages: List[Dict], temperature: fl
         try:
             client = _get_http_client()
             async with client.stream('POST', target_url, json=payload, headers=h, timeout=stream_timeout) as r:
-                _clear_host_dead(target_url)
                 if r.status_code != 200:
                     raw = (await r.aread()).decode(errors="replace")
                     friendly = _format_upstream_error(r.status_code, raw, target_url)
                     yield f'event: error\ndata: {json.dumps({"status": r.status_code, "text": friendly, "raw": raw[:500]})}\n\n'
                     return
+                _clear_host_dead(target_url)
                 async for line in r.aiter_lines():
                     if not line:
                         continue
@@ -1914,12 +1914,12 @@ async def stream_llm(url: str, model: str, messages: List[Dict], temperature: fl
         try:
             client = _get_http_client()
             async with client.stream('POST', target_url, json=payload, headers=h, timeout=stream_timeout) as r:
-                _clear_host_dead(target_url)
                 if r.status_code != 200:
                     raw = (await r.aread()).decode(errors="replace")
                     friendly = _format_upstream_error(r.status_code, raw, target_url)
                     yield f'event: error\ndata: {json.dumps({"status": r.status_code, "text": friendly, "raw": raw[:500]})}\n\n'
                     return
+                _clear_host_dead(target_url)
                 async for line in r.aiter_lines():
                     # SSE allows "data:value" with no space after the colon
                     # (the space is optional per the spec). Some gateways and
@@ -2052,12 +2052,12 @@ async def stream_llm(url: str, model: str, messages: List[Dict], temperature: fl
     try:
         client = _get_http_client()
         async with client.stream('POST', target_url, json=payload, headers=h, timeout=stream_timeout) as r:
-            _clear_host_dead(target_url)
             if r.status_code != 200:
                 raw = (await r.aread()).decode(errors="replace")
                 friendly = _format_upstream_error(r.status_code, raw, target_url)
                 yield f'event: error\ndata: {json.dumps({"status": r.status_code, "text": friendly, "raw": raw[:500]})}\n\n'
                 return
+            _clear_host_dead(target_url)
 
             async for line in r.aiter_lines():
                 if not line:

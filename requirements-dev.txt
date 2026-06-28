@@ -1,0 +1,7 @@
+# Dev / test dependencies — not installed in production images.
+pytest>=8.0.0,<9.0.0
+pytest-asyncio>=0.24.0,<1.0.0
+# starlette.testclient prefers httpx2 since Starlette 1.2.0 and warns on every
+# TestClient import when only classic httpx is present. Runtime code keeps
+# using `httpx`; this is test-client only.
+httpx2>=0.1.0,<1.0.0

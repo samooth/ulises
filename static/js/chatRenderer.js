@@ -8,6 +8,7 @@ import { providerLogo, providerLabel } from './providers.js';
 import settingsModule from './settings.js';
 import spinnerModule from './spinner.js';
 import { bindMenuDismiss } from './escMenuStack.js';
+import { API_BASE } from './apiBase.js';
 import { matchModelKey } from './model/matchKey.js';
 
 const SEARCH_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>';
@@ -986,7 +987,8 @@ function _appendContinuePrompt(container) {
   container.appendChild(wrap);
 }
 function _appendReportButton(container, sessionId) {
-  var apiBase = window.API_BASE || '';
+  var apiBase = API_BASE;
+
 
   // Wrapper holds report button + chat-about button
   var wrap = document.createElement('div');

@@ -16,8 +16,7 @@ import {
   _calReadableTextColor,
   _ds, _addDays, _shiftDT, _tzOffset, _localDateOf,
 } from './calendar/utils.js';
-
-const API_BASE = window.location.origin;
+import { API_BASE } from './apiBase.js';
 // Open a file picker, upload the chosen image, return the URL string.
 function _pickCalBgImage() {
   return new Promise(resolve => {

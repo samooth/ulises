@@ -11,8 +11,7 @@ import { makeWindowDraggable } from './windowDrag.js';
 import { snapModalToZone } from './tileManager.js';
 import { applyEdgeDock, clearDockSide } from './modalSnap.js';
 import { topToolWindowZ } from './toolWindowZOrder.js';
-
-const API_BASE = window.location.origin;
+import { API_BASE } from './apiBase.js';
 let _open = false;
 let _notes = [];
 let _editingId = null;

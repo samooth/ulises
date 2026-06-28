@@ -29,6 +29,8 @@ import re
 from typing import Any, Dict, List, Optional, Tuple
 from urllib.parse import urlparse
 
+from core.async_utils import safe_create_task
+
 logger = logging.getLogger(__name__)
 
 
@@ -463,7 +465,7 @@ def maybe_escalate(
         return None
 
     # Fire async — don't block the user's chat.
-    return asyncio.create_task(
+    return safe_create_task(
         escalate_and_learn(user_request, tool_results, agent_reply, reason or "", owner),
         name="teacher_escalation",
     )

@@ -1,8 +1,11 @@
 import asyncio
+import logging
 import sys
 import time
 import collections
 from typing import Optional, Callable, Awaitable, Tuple, Dict
+
+logger = logging.getLogger(__name__)
 from src.constants import MAX_OUTPUT_CHARS
 
 DEFAULT_BASH_TIMEOUT = 60 * 60     # 1 hour
@@ -46,7 +49,7 @@ async def _run_subprocess_streaming(
                         "tail": "\n".join(list(tail)),
                     })
                 except Exception:
-                    pass
+                    pass  # progress callback is best-effort
             await asyncio.sleep(PROGRESS_INTERVAL_S)
 
     rd_out = asyncio.create_task(_reader(proc.stdout, stdout_full, "out"))
@@ -58,23 +61,31 @@ async def _run_subprocess_streaming(
         await asyncio.wait_for(proc.wait(), timeout=timeout)
     except asyncio.TimeoutError:
         timed_out = True
-        try:
-            proc.kill()
-        except Exception:
-            pass
-        try:
-            await asyncio.wait_for(proc.wait(), timeout=2)
-        except Exception:
-            pass
-    except asyncio.CancelledError:
-        try:
-            proc.kill()
-        except Exception:
-            pass
-        try:
-            await asyncio.wait_for(proc.wait(), timeout=2)
-        except Exception:
-            pass
+            try:
+                proc.kill()
+            except ProcessLookupError:
+                pass  # already dead
+            except Exception as e:
+                logger.warning("kill failed (timeout path): %s", e)
+            try:
+                await asyncio.wait_for(proc.wait(), timeout=2)
+            except asyncio.TimeoutError:
+                pass  # best-effort wait
+            except Exception as e:
+                logger.warning("wait after kill failed (timeout path): %s", e)
+        except asyncio.CancelledError:
+            try:
+                proc.kill()
+            except ProcessLookupError:
+                pass  # already dead
+            except Exception as e:
+                logger.warning("kill failed (cancel path): %s", e)
+            try:
+                await asyncio.wait_for(proc.wait(), timeout=2)
+            except asyncio.TimeoutError:
+                pass  # best-effort wait
+            except Exception as e:
+                logger.warning("wait after kill failed (cancel path): %s", e)
         for t in (rd_out, rd_err):
             t.cancel()
         if prog_task is not None:
@@ -90,8 +101,10 @@ async def _run_subprocess_streaming(
         for t in (rd_out, rd_err):
             try:
                 await asyncio.wait_for(t, timeout=1)
-            except Exception:
+            except (asyncio.TimeoutError, asyncio.CancelledError):
                 pass
+            except Exception as e:
+                logger.warning("reader drain failed: %s", e)
 
     return (
         "\n".join(stdout_full),

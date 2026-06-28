@@ -41,6 +41,7 @@
  * }} deps
  */
 import { state } from './state.js';
+import { API_BASE } from '../apiBase.js';
 
 export function wireInpaintButtons({
   buildMergedMaskCanvas, dilateMask, applyInpaintFeather,
@@ -136,7 +137,7 @@ export function wireInpaintButtons({
       const dilatedMask = dilateMask(mergedMask, padPx);
       const imageB64 = flatCanvas.toDataURL('image/png').split(',')[1];
       const maskB64 = dilatedMask.toDataURL('image/png').split(',')[1];
-      const res = await fetch('/api/image/inpaint', {
+      const res = await fetch(`${API_BASE}/api/image/inpaint`, {
         method: 'POST', credentials: 'same-origin',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify((() => {

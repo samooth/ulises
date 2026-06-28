@@ -23,8 +23,7 @@ import {
 } from './emailLibrary/signatureFold.js';
 import { state } from './emailLibrary/state.js';
 import { collapseSidebarToRail } from './modalSnap.js';
-
-const API_BASE = window.location.origin;
+import { API_BASE } from './apiBase.js';
 let _emailUnreadChipClickWired = false;
 let _libLoadSeq = 0;
 let _libFolderSeq = 0;
@@ -375,7 +374,7 @@ function _syncEmailReminderBellVisibility(enabled) {
 
 async function _loadEmailReminderBellVisibility() {
   try {
-    const res = await fetch('/api/auth/settings', { credentials: 'same-origin' });
+    const res = await fetch(`${API_BASE}/api/auth/settings`, { credentials: 'same-origin' });
     const settings = await res.json();
     _syncEmailReminderBellVisibility(settings.reminder_channel === 'email');
   } catch (_) {

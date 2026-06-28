@@ -712,7 +712,7 @@ def _endpoint_lookup_keys(endpoint_url: str) -> List[str]:
     try:
         from src.endpoint_resolver import normalize_base
         add(normalize_base(raw))
-    except Exception:
+    except ImportError:
         pass
     return keys
 

@@ -44,7 +44,9 @@ def require_admin(request: Request):
         if getattr(request.state, "current_user", None) == INTERNAL_TOOL_USER:
             return
     except Exception:
-        pass
+        import logging
+        logging.getLogger(__name__).exception("require_admin: unexpected error checking internal token")
+        raise HTTPException(403, "Admin only")
 
     auth_mgr = getattr(request.app.state, "auth_manager", None)
     if os.getenv("AUTH_ENABLED", "true").lower() == "false":

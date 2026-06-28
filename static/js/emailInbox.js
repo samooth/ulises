@@ -9,8 +9,7 @@ import { initEmailLibrary, openEmailLibrary, closeEmailLibrary, isOpen as isLibO
 import * as Modals from './modalManager.js';
 import { applyEdgeDock } from './modalSnap.js';
 import { buildReplyAllCc } from './emailLibrary/replyRecipients.js';
-
-const API_BASE = window.location.origin;
+import { API_BASE } from './apiBase.js';
 const _acct = () => window.__ulisesActiveEmailAccount
   ? `&account_id=${encodeURIComponent(window.__ulisesActiveEmailAccount)}`
   : '';

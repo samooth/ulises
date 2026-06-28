@@ -23,7 +23,7 @@ from src.embedding_lanes import (
 try:
     import numpy as np
 except ImportError:
-    np = None  # type: ignore
+    np = None  # type: ignore[assignment]  # numpy is optional; imported lazily in _lazy_import_numpy()
 
 logger = logging.getLogger(__name__)
 

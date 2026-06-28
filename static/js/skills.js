@@ -7,8 +7,7 @@
 
 import uiModule from './ui.js';
 import * as spinnerModule from './spinner.js';
-
-const API = window.location.origin;
+import { API_BASE } from './apiBase.js';
 let skills = [];
 let builtinSkills = [];   // read-only agent tool capabilities (TOOL_SECTIONS)
 let loaded = false;
@@ -34,7 +33,7 @@ function _playSkillsCascade(container = document.getElementById('skills-list')) 
 const _mdCache = new Map();
 async function _fetchSkillMarkdown(name) {
   if (_mdCache.has(name)) return _mdCache.get(name);
-  const res = await fetch(`${API}/api/skills/${encodeURIComponent(name)}/markdown`);
+  const res = await fetch(`${API_BASE}/api/skills/${encodeURIComponent(name)}/markdown`);
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   const data = await res.json();
   const md = data.markdown || '';
@@ -89,9 +88,9 @@ export async function loadSkills(cascade = false) {
   if (_loadPromise) return _loadPromise;
   _loadPromise = (async () => {
   try {
-    const res = await fetch(`${API}/api/skills`);
+    const res = await fetch(`${API_BASE}/api/skills`);
     const data = await res.json();
-    // Dedupe by name (case-insensitive) — the API has occasionally
+    // Dedupe by name (case-insensitive) — the API_BASE has occasionally
     // returned the same skill twice (built-in shadow + user copy, or
     // a write-then-read race), and rendering both made the duplicate
     // detector mark BOTH entries as the "recommended" keeper.
@@ -545,7 +544,7 @@ async function _expandBuiltinCard(card, name) {
   if (pre && !card._loaded) {
     pre.textContent = 'Loading…';
     try {
-      const res = await fetch(`${API}/api/skills/builtin/${encodeURIComponent(name)}`);
+      const res = await fetch(`${API_BASE}/api/skills/builtin/${encodeURIComponent(name)}`);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
       pre.textContent = data.text || '(empty)';
@@ -579,7 +578,7 @@ async function _saveBuiltinEdit(card, name) {
   const ta = card.querySelector('.skill-md-editor');
   if (!ta) return;
   try {
-    const res = await fetch(`${API}/api/skills/builtin/${encodeURIComponent(name)}`, {
+    const res = await fetch(`${API_BASE}/api/skills/builtin/${encodeURIComponent(name)}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ text: ta.value }),
@@ -594,7 +593,7 @@ async function _saveBuiltinEdit(card, name) {
 async function _revertBuiltin(name) {
   if (!(await uiModule.styledConfirm(`Revert "${name}" to its original built-in instructions?`, { confirmText: 'Revert', danger: true }))) return;
   try {
-    const res = await fetch(`${API}/api/skills/builtin/${encodeURIComponent(name)}`, { method: 'DELETE' });
+    const res = await fetch(`${API_BASE}/api/skills/builtin/${encodeURIComponent(name)}`, { method: 'DELETE' });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     uiModule.showToast('Reverted to default');
     builtinSkills = [];
@@ -1056,7 +1055,7 @@ async function _saveSkillEdit(card, name) {
   const ta = preview?.querySelector('.skill-md-editor');
   if (!ta) return;
   try {
-    const res = await fetch(`${API}/api/skills/${encodeURIComponent(name)}/markdown`, {
+    const res = await fetch(`${API_BASE}/api/skills/${encodeURIComponent(name)}/markdown`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ markdown: ta.value }),
@@ -1081,7 +1080,7 @@ async function _deleteSkill(name, card = null) {
       .find(c => { const n = c.querySelector('.skill-card-name'); return n && n.textContent === name; }) || null;
   }
   try {
-    await fetch(`${API}/api/skills/${encodeURIComponent(name)}`, { method: 'DELETE' });
+    await fetch(`${API_BASE}/api/skills/${encodeURIComponent(name)}`, { method: 'DELETE' });
     _mdCache.delete(name);
     if (card) {
       if (card._testPoll) { clearInterval(card._testPoll); card._testPoll = null; }
@@ -1097,7 +1096,7 @@ async function _deleteSkill(name, card = null) {
 
 async function _setSkillStatus(name, status) {
   try {
-    await fetch(`${API}/api/skills/${encodeURIComponent(name)}`, {
+    await fetch(`${API_BASE}/api/skills/${encodeURIComponent(name)}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ status }),
@@ -1111,7 +1110,7 @@ async function _setSkillStatus(name, status) {
 
 async function _fetchTestStatus(name) {
   try {
-    const r = await fetch(`${API}/api/skills/${encodeURIComponent(name)}/test-status`);
+    const r = await fetch(`${API_BASE}/api/skills/${encodeURIComponent(name)}/test-status`);
     return r.ok ? await r.json() : { status: 'none' };
   } catch { return { status: 'none' }; }
 }
@@ -1159,7 +1158,7 @@ async function _testSkill(card, name, force = false) {
       endpoint_url = (sm && sm.getCurrentEndpointUrl && sm.getCurrentEndpointUrl()) || '';
     } catch (_) {}
     try {
-      const res = await fetch(`${API}/api/skills/${encodeURIComponent(name)}/test`, {
+      const res = await fetch(`${API_BASE}/api/skills/${encodeURIComponent(name)}/test`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ model, endpoint_url }),
       });
@@ -1440,7 +1439,7 @@ async function _auditAllSkills(opts = {}) {
     const confirmed = await _confirmAuditSkills(label);
     if (!confirmed.ok) return;
     try {
-      const r = await fetch(`${API}/api/skills/audit-all`, {
+      const r = await fetch(`${API_BASE}/api/skills/audit-all`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ scope: explicitNames ? 'selected' : 'all', names, skip_audited: confirmed.skipAudited }),
       });
@@ -1544,7 +1543,7 @@ function _highlightAuditCard(name) {
 
 async function _fetchAuditStatus() {
   try {
-    const r = await fetch(`${API}/api/skills/audit-all/status`);
+    const r = await fetch(`${API_BASE}/api/skills/audit-all/status`);
     return r.ok ? await r.json() : { status: 'none' };
   } catch { return { status: 'none' }; }
 }
@@ -1590,7 +1589,7 @@ function _renderAuditPanel(panel, st) {
     cancel.disabled = true;
     cancel.textContent = 'Cancelling...';
     try {
-      await fetch(`${API}/api/skills/audit-all/cancel`, { method: 'POST', credentials: 'same-origin' });
+      await fetch(`${API_BASE}/api/skills/audit-all/cancel`, { method: 'POST', credentials: 'same-origin' });
       const s = await _fetchAuditStatus();
       _renderAuditPanel(panel, { ...s, status: s.status === 'none' ? 'cancelled' : s.status });
       _highlightAuditCard(null);
@@ -1679,7 +1678,7 @@ async function _bulkDelete() {
   const deletedNames = [];
   for (const name of _selectedNames) {
     try {
-      const res = await fetch(`${API}/api/skills/${encodeURIComponent(name)}`, { method: 'DELETE' });
+      const res = await fetch(`${API_BASE}/api/skills/${encodeURIComponent(name)}`, { method: 'DELETE' });
       if (res.ok) {
         deleted++;
         deletedNames.push(name);
@@ -1698,7 +1697,7 @@ async function _bulkDelete() {
 
 async function _loadSkillApprovalThreshold() {
   try {
-    const res = await fetch(`${API}/api/prefs`, { credentials: 'same-origin' });
+    const res = await fetch(`${API_BASE}/api/prefs`, { credentials: 'same-origin' });
     if (!res.ok) return;
     const prefs = await res.json();
     const raw = prefs.skill_min_confidence ?? prefs.skill_autosave_min_confidence;
@@ -1737,7 +1736,7 @@ async function _bulkDeleteNonPassing() {
   const deletedNames = [];
   for (const name of names) {
     try {
-      const res = await fetch(`${API}/api/skills/${encodeURIComponent(name)}`, { method: 'DELETE' });
+      const res = await fetch(`${API_BASE}/api/skills/${encodeURIComponent(name)}`, { method: 'DELETE' });
       if (res.ok) {
         deleted++;
         deletedNames.push(name);
@@ -1762,7 +1761,7 @@ async function _bulkApprove() {
     const sk = skills.find(s => (s.name || s.id) === name);
     if (sk && sk.status === 'published') continue;
     try {
-      const res = await fetch(`${API}/api/skills/${encodeURIComponent(name)}`, {
+      const res = await fetch(`${API_BASE}/api/skills/${encodeURIComponent(name)}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status: 'published' }),
@@ -1788,7 +1787,7 @@ async function _bulkAudit() {
 async function _showSkillSource(name) {
   let md = '';
   try {
-    const res = await fetch(`${API}/api/skills/${encodeURIComponent(name)}/markdown`);
+    const res = await fetch(`${API_BASE}/api/skills/${encodeURIComponent(name)}/markdown`);
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const data = await res.json();
     md = data.markdown || '';
@@ -1827,7 +1826,7 @@ async function _showSkillSource(name) {
       // tool call instead. We have a /api/skills/{name} PUT for fields, but
       // a full SKILL.md replace is simpler via the parsed-then-PUT approach
       // below: parse client-side by uploading via the tool route.
-      const res = await fetch(`${API}/api/skills/${encodeURIComponent(name)}/markdown`, {
+      const res = await fetch(`${API_BASE}/api/skills/${encodeURIComponent(name)}/markdown`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ markdown: ta.value }),
@@ -1852,7 +1851,7 @@ async function importSkillFromUrl() {
   const btn = document.getElementById('skill-import-url-btn');
   if (btn) btn.disabled = true;
   try {
-    const res = await fetch(`${API}/api/skills/import-from-url`, {
+    const res = await fetch(`${API_BASE}/api/skills/import-from-url`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ url }),
@@ -1893,7 +1892,7 @@ async function addSkill() {
   const tags = tagsRaw ? tagsRaw.split(',').map(t => t.trim()).filter(Boolean) : [];
 
   try {
-    const res = await fetch(`${API}/api/skills/add`, {
+    const res = await fetch(`${API_BASE}/api/skills/add`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({

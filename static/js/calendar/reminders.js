@@ -10,8 +10,7 @@
 // the calendar's entry module.
 
 import uiModule from '../ui.js';
-
-const API_BASE = window.location.origin;
+import { API_BASE } from '../apiBase.js';
 
 let _notifFired = new Set(JSON.parse(localStorage.getItem('cal-notif-fired') || '[]'));
 

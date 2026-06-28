@@ -72,16 +72,21 @@ const el = uiModule.el;
 // changes take effect immediately (previously cached once at page load and
 // went stale when the user changed their default model).
 let _defaultChat = null;
+let _defaultChatPromise = null;
 async function _refreshDefaultChat() {
-  try {
-    const d = await (await fetch('/api/default-chat')).json();
-    if (d && d.endpoint_url && d.model) {
-      _defaultChat = d;
-      try { window.__ulisesDefaultChat = d; } catch (_) {}
-      return d;
-    }
-  } catch (_) {}
-  return null;
+  if (_defaultChatPromise) return _defaultChatPromise;
+  _defaultChatPromise = (async () => {
+    try {
+      const d = await (await fetch('/api/default-chat')).json();
+      if (d && d.endpoint_url && d.model) {
+        _defaultChat = d;
+        try { window.__ulisesDefaultChat = d; } catch (_) {}
+        return d;
+      }
+    } catch (_) {}
+    return null;
+  })();
+  return _defaultChatPromise;
 }
 // Prime the cache once at load for initial paint paths that read _defaultChat
 // synchronously; later reads should call _refreshDefaultChat() first.
@@ -268,11 +273,13 @@ function initializeEventListeners() {
     const _sidebarEl = el('sidebar');
     if (_sidebarEl) {
       let _wasHidden = _sidebarEl.classList.contains('hidden');
-      new MutationObserver(() => {
+      const obs = new MutationObserver(() => {
         const nowHidden = _sidebarEl.classList.contains('hidden');
         if (_wasHidden && !nowHidden) window.closeAllPopups();
         _wasHidden = nowHidden;
-      }).observe(_sidebarEl, { attributes: true, attributeFilter: ['class'] });
+      });
+      obs.observe(_sidebarEl, { attributes: true, attributeFilter: ['class'] });
+      (window.__appObservers || (window.__appObservers = [])).push(obs);
     }
     // Clicking session name also opens dropdown
     const currentMeta = el('current-meta');
@@ -424,14 +431,17 @@ function initializeEventListeners() {
       input.focus();
       input.select();
 
+      let _renameGuard = false;
       const commit = async () => {
+        if (_renameGuard) return;
+        _renameGuard = true;
         const newName = input.value.trim();
         if (newName && newName !== currentName) {
           // Materialize a pending (new) chat first so it has an id to rename.
           if (!sid && sessionModule.materializePendingSession) {
             try { await sessionModule.materializePendingSession(); sid = sessionModule.getCurrentSessionId(); } catch (_) {}
           }
-          if (!sid) { metaEl.textContent = newName; return; }
+          if (!sid) { metaEl.textContent = newName; _renameGuard = false; return; }
           const fd = new FormData();
           fd.append('name', newName);
           await fetch(`${API_BASE}/api/session/${sid}`, { method: 'PATCH', body: fd });
@@ -443,6 +453,7 @@ function initializeEventListeners() {
         } else {
           metaEl.textContent = origText;
         }
+        _renameGuard = false;
       };
       input.addEventListener('blur', commit);
       input.addEventListener('keydown', (ev) => {
@@ -840,8 +851,8 @@ function initializeEventListeners() {
     toolCookbookBtn.addEventListener('click', async () => {
       if (!cookbookModule) return;
       // Try minimized→restore or open→minimize via the manager first
-      const Modals = await import('./js/modalManager.js');
-      if (!Modals.toggle('cookbook-modal')) {
+      const Modals = await import('./js/modalManager.js').catch(e => { console.warn('Failed to load modalManager', e); return null; });
+      if (!Modals || !Modals.toggle('cookbook-modal')) {
         // Not registered yet → fresh open
         cookbookModule.open();
       }
@@ -868,8 +879,8 @@ function initializeEventListeners() {
   if (toolGalleryBtn) {
     toolGalleryBtn.addEventListener('click', async () => {
       if (!galleryModule) return;
-      const Modals = await import('./js/modalManager.js');
-      if (!Modals.toggle('gallery-modal')) {
+      const Modals = await import('./js/modalManager.js').catch(e => { console.warn('Failed to load modalManager', e); return null; });
+      if (!Modals || !Modals.toggle('gallery-modal')) {
         if (galleryModule.isGalleryOpen()) galleryModule.closeGallery();
         else galleryModule.openGallery();
       }
@@ -897,10 +908,10 @@ function initializeEventListeners() {
   if (toolCalendarBtn) {
     toolCalendarBtn.addEventListener('click', async () => {
       if (!calendarModule) return;
-      const Modals = await import('./js/modalManager.js');
+      const Modals = await import('./js/modalManager.js').catch(e => { console.warn('Failed to load modalManager', e); return null; });
       // toggle returns true when a registered modal was minimized/restored;
       // returns false when nothing is registered → open fresh.
-      if (!Modals.toggle('calendar-modal')) {
+      if (!Modals || !Modals.toggle('calendar-modal')) {
         if (calendarModule.isCalendarOpen()) calendarModule.closeCalendar();
         else calendarModule.openCalendar();
       }
@@ -2067,10 +2078,11 @@ function initializeEventListeners() {
     }
 
     // Observe active class changes to sync mirror states
-    const observer = new MutationObserver(() => syncMirrorStates());
+    const toolbarObserver = new MutationObserver(() => syncMirrorStates());
     collapsibleBtns.forEach(btn => {
-      observer.observe(btn, { attributes: true, attributeFilter: ['class'] });
+      toolbarObserver.observe(btn, { attributes: true, attributeFilter: ['class'] });
     });
+    (window.__appObservers || (window.__appObservers = [])).push(toolbarObserver);
 
     // Run on resize and on load
     window.addEventListener('resize', () => requestAnimationFrame(checkToolbarOverflow));
@@ -2082,12 +2094,14 @@ function initializeEventListeners() {
     // Also re-check when sidebar visibility changes
     const sidebarEl = el('sidebar');
     if (sidebarEl) {
-      new MutationObserver(() => requestAnimationFrame(checkToolbarOverflow))
-        .observe(sidebarEl, { attributes: true, attributeFilter: ['class'] });
+      const obs = new MutationObserver(() => requestAnimationFrame(checkToolbarOverflow));
+      obs.observe(sidebarEl, { attributes: true, attributeFilter: ['class'] });
+      (window.__appObservers || (window.__appObservers = [])).push(obs);
     }
     // Re-check when doc panel opens/closes (body.doc-view toggled)
-    new MutationObserver(() => requestAnimationFrame(checkToolbarOverflow))
-      .observe(document.body, { attributes: true, attributeFilter: ['class'] });
+    const bodyObserver = new MutationObserver(() => requestAnimationFrame(checkToolbarOverflow));
+    bodyObserver.observe(document.body, { attributes: true, attributeFilter: ['class'] });
+    (window.__appObservers || (window.__appObservers = [])).push(bodyObserver);
     // Re-check when input bar itself resizes (e.g. doc panel drag)
     const inputBottom = inputLeft.parentElement;
     if (inputBottom) {
@@ -2874,7 +2888,7 @@ function initializeEventListeners() {
     document.querySelectorAll('.modal').forEach(injectMinimizeButton);
 
     // Watch for dynamically-created modals
-    new MutationObserver((mutations) => {
+    const modalObserver = new MutationObserver((mutations) => {
       for (const m of mutations) {
         for (const n of m.addedNodes) {
           if (n.nodeType !== 1) continue;
@@ -2886,7 +2900,11 @@ function initializeEventListeners() {
           }
         }
       }
-    }).observe(document.body, { childList: true, subtree: true });
+    });
+    // Scope to the main layout container instead of document.body with subtree:true
+    const appContainer = document.getElementById('app') || document.body;
+    modalObserver.observe(appContainer, { childList: true, subtree: true });
+    (window.__appObservers || (window.__appObservers = [])).push(modalObserver);
   })();
 
   // Preset button (in overflow menu)
@@ -4075,6 +4093,15 @@ function startUlisesApp() {
     });
   }
 }
+
+// ── Observer cleanup ──
+// Disconnect all tracked MutationObservers on page unload so they don't
+// keep references to removed DOM nodes. Observers are registered at creation
+// time via `(window.__appObservers ||= []).push(obs)`.
+window.addEventListener('beforeunload', () => {
+  const obs = window.__appObservers;
+  if (obs) for (let i = 0; i < obs.length; i++) obs[i].disconnect();
+});
 
 if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', startUlisesApp, { once: true });

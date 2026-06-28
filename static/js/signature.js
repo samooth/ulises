@@ -12,7 +12,7 @@
 // derived from pointer velocity (slower → thicker), which gives signatures
 // their characteristic ink-bleed feel.
 
-const API_BASE = window.location.origin;
+import { API_BASE } from './apiBase.js';
 
 function _esc(s) {
   return String(s ?? '')

@@ -2314,7 +2314,7 @@ def setup_model_routes(model_discovery):
         matching enabled endpoint exists.
         """
         cleared = 0
-        rows = db.query(DbSession).filter(DbSession.endpoint_url.isnot(None)).all()
+        rows = db.query(DbSession).filter(DbSession.endpoint_url.isnot(None)).limit(5000).all()
         for row in rows:
             if _session_uses_endpoint_url(row.endpoint_url or "", base_url):
                 row.headers = {}

@@ -620,9 +620,9 @@ def setup_note_routes(task_scheduler=None):
                 q = q.filter(Note.label == label)
             # Archived view: most recently archived first. Active view: pin + manual order.
             if archived is True:
-                notes = q.order_by(Note.updated_at.desc()).all()
+                notes = q.order_by(Note.updated_at.desc()).limit(500).all()
             else:
-                notes = q.order_by(Note.pinned.desc(), Note.sort_order.asc(), Note.updated_at.desc()).all()
+                notes = q.order_by(Note.pinned.desc(), Note.sort_order.asc(), Note.updated_at.desc()).limit(500).all()
             return {"notes": [_note_to_dict(n) for n in notes]}
         finally:
             db.close()
