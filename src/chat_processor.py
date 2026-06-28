@@ -361,6 +361,11 @@ class ChatProcessor:
                 if len(search_query) > 150:
                     search_query = search_query[:150].strip()
 
+                # Defensive cleanup of the final selected query (interim fix
+                # for #4547): strip any residual fenced/inline markdown so that
+                # neither the generated query nor the first-line fallback leaks
+                # fences or backticks into the search call. No-op on clean
+                # generated queries; collapses to "" when the query is all code.
                 search_query = _clean_search_query(search_query, max_len=150)
 
                 if search_query:
