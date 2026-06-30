@@ -181,6 +181,8 @@ function initRailHoverLabels() {
     btn.appendChild(span);
   });
 }
+
+
 // Redirect to login on 401 from any fetch
 const _origFetch = window.fetch;
 window.fetch = async function(...args) {
@@ -3517,6 +3519,7 @@ function startUlisesApp() {
   document.documentElement.style.setProperty('--line-height', '20px');
   // Initialize i18n (lazy — does not block other init)
   i18nInit().catch(e => console.warn('[i18n] Init failed, using English:', e));
+  initRailHoverLabels();
 
   // Smooth keyboard open/close on mobile — keep chat scrolled to bottom
   if (window.visualViewport && 'ontouchstart' in window) {
