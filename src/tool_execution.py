@@ -23,6 +23,7 @@ from typing import Any, Awaitable, Callable, Dict, Optional, Tuple
 
 from src.tool_security import is_public_blocked_tool, owner_is_admin_or_single_user
 from src.tool_policy import ToolPolicy
+from src.tool_schemas import BUILTIN_EMAIL_TOOLS
 from src.constants import MAX_OUTPUT_CHARS, MAX_READ_CHARS, MAX_DIFF_LINES, DATA_DIR
 from src.tool_utils import _truncate, get_mcp_manager
 
@@ -388,6 +389,18 @@ def _parse_write_file(content: str) -> Dict:
     return {"path": lines[0].strip(), "content": lines[1] if len(lines) > 1 else ""}
 
 
+# JSON primary key for each MCP-routed tool: when the block content is a JSON
+# object containing this key, the JSON is used directly (bypassing the legacy
+# line-based arg builder). This lets models that emit inline JSON for
+# non-code tags get their args decoded correctly.
+_MCP_JSON_PRIMARY_KEYS: Dict[str, str] = {
+    "web_search": "query",
+    "web_fetch": "url",
+    "read_file": "path",
+    "write_file": "path",
+    "generate_image": "prompt",
+}
+
 _MCP_ARG_PARSERS: Dict[str, Callable[[str], Dict[str, str]]] = {
     "bash":           lambda c: {"command": c},
     "python":         lambda c: {"code": c},
@@ -401,7 +414,24 @@ _MCP_ARG_PARSERS: Dict[str, Callable[[str], Dict[str, str]]] = {
 
 
 def _build_mcp_args(tool: str, content: str) -> Dict:
-    """Convert fenced-block text content to structured MCP arguments."""
+    """Convert fenced-block text content to structured MCP arguments.
+
+    When content is a JSON object containing the tool's primary key (e.g.
+    ``{"query": "..."}`` for web_search), decode it directly — models that
+    emit inline JSON for non-code tags should not have their args treated
+    as a single literal value. Otherwise fall through to the legacy line-based
+    arg builder.
+    """
+    raw = (content or "").strip()
+    if raw:
+        try:
+            parsed = json.loads(raw)
+        except (json.JSONDecodeError, TypeError):
+            parsed = None
+        if isinstance(parsed, dict):
+            primary = _MCP_JSON_PRIMARY_KEYS.get(tool)
+            if primary and primary in parsed:
+                return parsed
     parser = _MCP_ARG_PARSERS.get(tool)
     return parser(content) if parser else {}
 
@@ -845,6 +875,43 @@ async def _execute_tool_block_impl(
     elif tool == "vault_unlock":
         desc = "vault_unlock"
         result = await do_vault_unlock(content, owner=owner)
+    elif tool in BUILTIN_EMAIL_TOOLS:
+        # Bare email tool name from fenced-block models (e.g. Ollama) — route to MCP email server.
+        # Non-admin owners never reach here: BUILTIN_EMAIL_TOOLS ⊆ NON_ADMIN_BLOCKED_TOOLS,
+        # so is_public_blocked_tool() above already rejected them.
+        mcp = get_mcp_manager()
+        qualified = f"mcp__email__{tool}"
+        desc = f"email: {tool}"
+        if mcp:
+            _raw = content.strip()
+            args = {}
+            _args_error = None
+            if _raw:
+                try:
+                    parsed = json.loads(_raw)
+                except (json.JSONDecodeError, TypeError) as _je:
+                    _args_error = (
+                        f"'{tool}' arguments are not valid JSON ({_je}). "
+                        'Send a JSON object, e.g. {"account": "work"} — '
+                        "keys and string values need double quotes."
+                    )
+                else:
+                    if isinstance(parsed, dict):
+                        args = parsed
+                    else:
+                        _args_error = (
+                            f"'{tool}' arguments must be a JSON object, "
+                            'e.g. {"uid": "..."} — got a JSON array/value instead.'
+                        )
+            if _args_error is not None:
+                result = {"error": _args_error, "exit_code": 1}
+            else:
+                if owner:
+                    args = dict(args)
+                    args[_EMAIL_MCP_OWNER_ARG] = owner
+                result = await mcp.call_tool(qualified, args)
+        else:
+            result = {"error": "MCP manager not available", "exit_code": 1}
     elif tool.startswith("mcp__"):
         # MCP tool dispatch
         mcp = get_mcp_manager()

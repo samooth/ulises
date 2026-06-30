@@ -207,7 +207,7 @@ async def test_mcp_email_owner_cannot_use_other_owner_account_for_list_read_send
     ]
 
     for tool_name, args in calls:
-        out = await es.call_tool(tool_name, {**args, "_odysseus_owner": "alice"})
+        out = await es.call_tool(tool_name, {**args, "_ulises_owner": "alice"})
         assert "Email account not found for selector" in out[0].text, tool_name
         assert "Bob Mail" not in out[0].text or "Available accounts" in out[0].text
 
@@ -232,7 +232,7 @@ async def test_mcp_send_email_stages_with_visible_owner_account_id(tmp_path, mon
             "subject": "Review",
             "body": "Please review.",
             "account": "Alice Mail",
-            "_odysseus_owner": "alice",
+            "_ulises_owner": "alice",
         },
     )
 

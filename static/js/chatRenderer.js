@@ -427,6 +427,23 @@ const TOOL_CALL_RE = /\[TOOL_CALL\][\s\S]*?\[\/TOOL_CALL\]/gi;
 let EXEC_FENCE_RE = null;
 const EXEC_FENCE_NON_TOOL = new Set(['bash', 'python']);
 
+function escapeRegex(source) {
+  return String(source).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function stripExecutedFence(match, tag, inline, body) {
+  const inlineArgs = (inline || '').trim();
+  if (!inlineArgs) return '';
+  const bodyText = (body || '').trim();
+  const content = bodyText ? `${inlineArgs}\n${bodyText}` : inlineArgs;
+  try {
+    JSON.parse(content);
+  } catch {
+    return match;
+  }
+  return '';
+}
+
 async function loadExecFenceRegex() {
   try {
     const res = await fetch('/api/tools', { credentials: 'same-origin' });
@@ -436,7 +453,10 @@ async function loadExecFenceRegex() {
       .filter((id) => id && !EXEC_FENCE_NON_TOOL.has(id));
     if (tags.length) {
       EXEC_FENCE_RE = new RegExp(
-        '```(?:' + tags.join('|') + ')\\s*\\n[\\s\\S]*?```', 'gi'
+        '```(' + tags.map(escapeRegex).join('|') + ')(?![\\w-])' +
+        '[ \\t]*([\\[{][^\\n]*?)?[ \\t]*(?=\\r?\\n|```)' +
+        '\\r?\\n?([\\s\\S]*?)```',
+        'gi'
       );
     }
   } catch (err) {
@@ -891,7 +911,7 @@ export function roleTimestamp(when) {
  */
 export function stripToolBlocks(text) {
   let cleaned = text.replace(TOOL_CALL_RE, '');
-  if (EXEC_FENCE_RE) cleaned = cleaned.replace(EXEC_FENCE_RE, '');
+  if (EXEC_FENCE_RE) cleaned = cleaned.replace(EXEC_FENCE_RE, stripExecutedFence);
   cleaned = cleaned.replace(DSML_TOOL_RE, '');
   cleaned = cleaned.replace(DSML_STRAY_RE, '');
   cleaned = cleaned.replace(XML_TOOL_CALL_RE, '');
