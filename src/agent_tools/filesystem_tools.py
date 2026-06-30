@@ -356,7 +356,13 @@ class GlobTool:
 
 class GrepTool:
     async def execute(self, content: str, ctx: dict) -> dict:
-        from src.tool_execution import _resolve_tool_path, _resolve_search_root, _truncate
+        from src.tool_execution import (
+            _SENSITIVE_FILE_PATTERNS,
+            _is_sensitive_path,
+            _resolve_tool_path,
+            _resolve_search_root,
+            _truncate,
+        )
         args: Dict[str, Any] = {}
         _s = (content or "").strip()
         if _s.startswith("{"):
@@ -428,6 +434,8 @@ class GrepTool:
             for fp in file_iter:
                 if len(hits) >= max_hits:
                     break
+                if _is_sensitive_path(os.path.realpath(fp)):
+                    continue
                 try:
                     with open(fp, "r", encoding="utf-8", errors="strict") as f:
                         for i, line in enumerate(f, 1):
