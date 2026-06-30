@@ -21,7 +21,12 @@ from typing import Any, Awaitable, Callable, Dict, Optional, Tuple
 
 
 
-from src.tool_security import is_public_blocked_tool, owner_is_admin_or_single_user
+from src.tool_security import (
+    BUILTIN_EMAIL_TOOLS,
+    email_tool_policy_names,
+    is_public_blocked_tool,
+    owner_is_admin_or_single_user,
+)
 from src.tool_policy import ToolPolicy
 from src.tool_schemas import BUILTIN_EMAIL_TOOLS
 from src.constants import MAX_OUTPUT_CHARS, MAX_READ_CHARS, MAX_DIFF_LINES, DATA_DIR
@@ -389,16 +394,29 @@ def _parse_write_file(content: str) -> Dict:
     return {"path": lines[0].strip(), "content": lines[1] if len(lines) > 1 else ""}
 
 
-# JSON primary key for each MCP-routed tool: when the block content is a JSON
-# object containing this key, the JSON is used directly (bypassing the legacy
-# line-based arg builder). This lets models that emit inline JSON for
-# non-code tags get their args decoded correctly.
-_MCP_JSON_PRIMARY_KEYS: Dict[str, str] = {
-    "web_search": "query",
-    "web_fetch": "url",
-    "read_file": "path",
-    "write_file": "path",
-    "generate_image": "prompt",
+# Primary argument key(s) for the legacy line-parsed tools. When a fenced
+# block's content is a JSON object carrying one of these keys, it's structured
+# inline args (the relaxed parser's ```web_search {"query": "..."}``` shape) —
+# use the object directly instead of letting the line-based parsers wrap the
+# whole JSON string as the query/url/path/prompt. Keyed off membership only
+# (the primary key never changes), so this can't drift; an unrecognized object
+# safely falls through to the line-based parser, i.e. the previous behavior.
+#
+# IMPORTANT — this only covers the MCP path. _build_mcp_args is reached via
+# _call_mcp_tool only for _MCP_TOOL_MAP tools (so an entry outside that map is
+# dead, as manage_memory was). And of these, only generate_image has a live MCP
+# server today; web_search/web_fetch/read_file/write_file have none, so they run
+# via _direct_fallback -> TOOL_HANDLERS, whose handlers decode JSON themselves
+# (see ReadFileTool/WriteFileTool/WebSearchTool/WebFetchTool). The entries here
+# are kept as defense-in-depth for if/when those servers are added. The live
+# fix for each server-less tool lives in its handler. test_write_file_inline_
+# json_args and test_mcp_json_primary_keys_are_all_live pin both halves.
+_MCP_JSON_PRIMARY_KEYS: Dict[str, tuple] = {
+    "web_search":     ("query", "queries"),
+    "web_fetch":      ("url",),
+    "read_file":      ("path",),
+    "write_file":     ("path",),
+    "generate_image": ("prompt",),
 }
 
 _MCP_ARG_PARSERS: Dict[str, Callable[[str], Dict[str, str]]] = {
@@ -414,24 +432,15 @@ _MCP_ARG_PARSERS: Dict[str, Callable[[str], Dict[str, str]]] = {
 
 
 def _build_mcp_args(tool: str, content: str) -> Dict:
-    """Convert fenced-block text content to structured MCP arguments.
-
-    When content is a JSON object containing the tool's primary key (e.g.
-    ``{"query": "..."}`` for web_search), decode it directly — models that
-    emit inline JSON for non-code tags should not have their args treated
-    as a single literal value. Otherwise fall through to the legacy line-based
-    arg builder.
-    """
-    raw = (content or "").strip()
-    if raw:
+    """Convert fenced-block text content to structured MCP arguments."""
+    primaries = _MCP_JSON_PRIMARY_KEYS.get(tool)
+    if primaries and content.strip().startswith("{"):
         try:
-            parsed = json.loads(raw)
+            decoded = json.loads(content.strip())
         except (json.JSONDecodeError, TypeError):
-            parsed = None
-        if isinstance(parsed, dict):
-            primary = _MCP_JSON_PRIMARY_KEYS.get(tool)
-            if primary and primary in parsed:
-                return parsed
+            decoded = None
+        if isinstance(decoded, dict) and any(k in decoded for k in primaries):
+            return decoded
     parser = _MCP_ARG_PARSERS.get(tool)
     return parser(content) if parser else {}
 
@@ -638,6 +647,12 @@ async def _execute_tool_block_impl(
     tool = block.tool_type
     content = block.content
 
+    # The block/disable gates below must match every policy-equivalent
+    # spelling of the tool name (bare email names alias their mcp__email__
+    # form — see email_tool_policy_names), not just the spelling the model
+    # happened to emit.
+    policy_names = email_tool_policy_names(tool)
+
     # Misformatted tool call detection: model put JSON inside ```python``` (or
     # similar) without naming the tool. Common with MiniMax-style outputs.
     # Return a helpful error so the model retries with the correct format.
@@ -665,13 +680,13 @@ async def _execute_tool_block_impl(
             pass
 
     # Reject tools that the user has disabled for this request
-    if disabled_tools and tool in disabled_tools:
+    if disabled_tools and not policy_names.isdisjoint(disabled_tools):
         desc = f"{tool}: BLOCKED"
         result = {"error": f"Tool '{tool}' is disabled by user.", "exit_code": 1}
         logger.info(f"Tool blocked by user: {tool}")
         return desc, result
 
-    if tool_policy and tool_policy.blocks(tool):
+    if tool_policy and any(tool_policy.blocks(name) for name in policy_names):
         desc = f"{tool}: BLOCKED"
         result = {
             "error": f"Execution of tool '{tool}' is forbade by the active guide-only policy.",
@@ -887,9 +902,17 @@ async def _execute_tool_block_impl(
             args = {}
             _args_error = None
             if _raw:
+                # A non-empty body is always meant to be the call's arguments,
+                # and every email tool takes a JSON object. Anything that
+                # isn't one is a correctable error — NOT a silent empty-args
+                # call, which would read the DEFAULT mailbox/folder instead of
+                # the one the model meant (#3966 class). Only an EMPTY body
+                # keeps the no-arg path (e.g. ```list_email_accounts```).
                 try:
                     parsed = json.loads(_raw)
                 except (json.JSONDecodeError, TypeError) as _je:
+                    # Covers both `{account: "work"}` (looks like JSON, bad)
+                    # and `account: work` (not JSON at all).
                     _args_error = (
                         f"'{tool}' arguments are not valid JSON ({_je}). "
                         'Send a JSON object, e.g. {"account": "work"} — '
@@ -906,9 +929,6 @@ async def _execute_tool_block_impl(
             if _args_error is not None:
                 result = {"error": _args_error, "exit_code": 1}
             else:
-                if owner:
-                    args = dict(args)
-                    args[_EMAIL_MCP_OWNER_ARG] = owner
                 result = await mcp.call_tool(qualified, args)
         else:
             result = {"error": "MCP manager not available", "exit_code": 1}

@@ -14,6 +14,7 @@ from typing import Optional
 
 from src.agent_tools import ToolBlock, TOOL_TAGS
 from src.tool_parsing import _TOOL_NAME_MAP
+from src.tool_security import BUILTIN_EMAIL_TOOLS
 
 logger = logging.getLogger(__name__)
 
@@ -1233,6 +1234,8 @@ def function_call_to_tool_block(name: str, arguments: str) -> Optional[ToolBlock
     # ["ls -la"], string, or number) as function arguments. Most local tools keep
     # the legacy empty-object coercion for stream robustness, but email MCP tools
     # must fail closed so a malformed call cannot read the default mailbox.
+    # Uses the shared BUILTIN_EMAIL_TOOLS (single source of truth) so the
+    # fail-closed set can't drift from the dispatch/blocklist sets.
     if not isinstance(args, dict):
         if tool_type.startswith("mcp__email__") or name in BUILTIN_EMAIL_TOOLS:
             logger.warning(f"Non-object email function call arguments for {name}: {args!r}; rejecting")
