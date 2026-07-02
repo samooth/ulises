@@ -314,7 +314,11 @@ class GlobTool:
                     ) == nbase
                 except ValueError:
                     inside = False
-                if inside and os.path.exists(cand):
+                # A literal that names a deny-listed sensitive file (.env,
+                # .ssh/id_rsa, …) falls through to the walk, which skips it —
+                # otherwise glob would surface secret paths that read_file /
+                # grep already refuse to touch.
+                if inside and os.path.exists(cand) and not _is_sensitive_path(cand):
                     return [cand], None
                 # Literal not at exact path — fall through to walk so
                 # e.g. "foo.py" still matches at any depth (like rglob).
