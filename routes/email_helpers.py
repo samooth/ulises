@@ -380,6 +380,26 @@ def _account_visible_to_owner(row, owner: str) -> bool:
         getattr(row, "from_address", None) or "",
     }
 
+
+def _account_visible_to_owner(row, owner: str) -> bool:
+    """Whether an authenticated `owner` may act on this EmailAccount row.
+
+    Mirrors the SQL predicate in `_get_email_config`'s
+    `_owner_or_matching_legacy_account`: a caller sees an account they own, or a
+    legacy owner-less account (owner NULL/"") only when its own mailbox
+    (`imap_user` / `from_address`) is the caller's. `email_accounts` is the one
+    owner-scoped table deliberately left out of the legacy-owner migration
+    backfill, so ownerless rows persist on multi-user deploys — making this the
+    gate that keeps one tenant off another's imported mailbox and its decrypted
+    IMAP/SMTP credentials."""
+    row_owner = getattr(row, "owner", None) or ""
+    if row_owner:
+        return row_owner == owner
+    return owner in {
+        getattr(row, "imap_user", None) or "",
+        getattr(row, "from_address", None) or "",
+    }
+
 def _q(name: str) -> str:
     """Quote an IMAP mailbox name. Defensive: escapes `\\` and `"` and wraps
     in double quotes so user-supplied folder names with spaces or quotes can't
