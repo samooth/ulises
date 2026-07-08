@@ -20,7 +20,7 @@ from src.model_context import estimate_tokens
 from src.settings import get_setting
 from src.prompt_security import untrusted_context_message
 from src.tool_security import blocked_tools_for_owner, plan_mode_disabled_tools
-from src.tool_policy import GUIDE_ONLY_DIRECTIVE, ToolPolicy
+from src.tool_policy import GUIDE_ONLY_DIRECTIVE, WEB_TOOL_NAMES, ToolPolicy
 from src.tool_utils import _truncate, get_mcp_manager
 from src.agent_tools import (
     parse_tool_blocks,
@@ -276,7 +276,7 @@ _DOMAIN_RULES = {
 }
 
 _DOMAIN_TOOL_MAP = {
-    "web": {"web_search", "web_fetch", "trigger_research", "manage_research"},
+    "web": set(WEB_TOOL_NAMES),
     "documents": {"create_document", "edit_document", "update_document", "suggest_document", "manage_documents"},
     "email": {"list_email_accounts", "list_emails", "read_email", "send_email", "reply_to_email", "bulk_email", "archive_email", "delete_email", "mark_email_read", "resolve_contact", "manage_contact"},
     "cookbook": {"download_model", "serve_model", "serve_preset", "list_serve_presets", "list_served_models", "stop_served_model", "tail_serve_output", "list_downloads", "cancel_download", "search_hf_models", "list_cached_models", "list_cookbook_servers", "adopt_served_model"},
@@ -2040,6 +2040,7 @@ async def stream_agent_loop(
     tool_policy: Optional[ToolPolicy] = None,
     workspace: Optional[str] = None,
     forced_tools: Optional[Set[str]] = None,
+    uploaded_files: Optional[list] = None,
     _is_teacher_run: bool = False,
 ) -> AsyncGenerator[str, None]:
     """Streaming agent loop generator.
@@ -2282,7 +2283,13 @@ async def stream_agent_loop(
         if "email" in (_intent.get("domains") or set()):
             _relevant_tools.add("ui_control")
         if "web" in (_intent.get("domains") or set()):
-            _relevant_tools.update({"web_search", "web_fetch"})
+            _relevant_tools.update(WEB_TOOL_NAMES)
+            _blocked_web_tools = sorted(WEB_TOOL_NAMES & disabled_tools)
+            if _blocked_web_tools:
+                logger.info(
+                    "[agent-intent] web domain selected but search tools remain disabled=%s",
+                    _blocked_web_tools,
+                )
         if "ui" in (_intent.get("domains") or set()):
             _relevant_tools.add("ui_control")
 
@@ -2292,9 +2299,18 @@ async def stream_agent_loop(
     if _relevant_tools is not None and active_document is not None:
         _relevant_tools.update({"edit_document", "update_document", "suggest_document"})
 
-    # Per-request UI toggles are stronger than retrieval. If the user turns on
-    # Search, the model must see the search tools even when the latest text is a
-    # typo or otherwise low-signal for tool RAG.
+    # Current-turn chat uploads are real files under the upload/data root. Make
+    # the read-side file/document tools visible immediately so the agent can
+    # inspect files whose inline text was truncated or omitted.
+    if not guide_only and uploaded_files:
+        if _relevant_tools is None:
+            from src.tool_index import ALWAYS_AVAILABLE
+            _relevant_tools = set(ALWAYS_AVAILABLE)
+        _relevant_tools.update({"read_file", "grep", "ls", "manage_documents"})
+
+    # Per-request forced tools are stronger than retrieval. Explicit search
+    # settings make web tools visible even when tool RAG misses them;
+    # route-level disabled_tools decides what remains allowed.
     if not guide_only and forced_tools:
         if _relevant_tools is None:
             from src.tool_index import ALWAYS_AVAILABLE
