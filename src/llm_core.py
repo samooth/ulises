@@ -13,6 +13,8 @@ from typing import Optional, Dict, List, Tuple
 from src.model_context import get_context_length, DEFAULT_CONTEXT
 from urllib.parse import urlparse
 
+from core.translations import t
+
 logger = logging.getLogger(__name__)
 
 class LLMConfig:
@@ -790,9 +792,9 @@ def _build_chatgpt_responses_payload(
 
 def _format_chatgpt_subscription_error(status_code: int, text: str) -> str:
     if status_code in (401, 403):
-        return "ChatGPT Subscription credentials expired or were rejected. Reconnect the provider."
+        return t("llm.chatgpt_credentials_expired")
     if status_code == 429:
-        return "ChatGPT Subscription quota or rate limit was reached. Retry after the upstream limit resets."
+        return t("llm.chatgpt_rate_limit")
     return _format_upstream_error(status_code, text, "https://chatgpt.com/backend-api/codex")
 
 
@@ -822,20 +824,33 @@ def _format_upstream_error(status: int, body: bytes | str, url: str) -> str:
         detail = (body or "").strip()[:240]
 
     if status in (401, 403):
-        msg = f"{provider} rejected the API key"
         if status == 403:
-            msg = f"{provider} denied access (403)"
+            msg = t("llm.access_denied").format(provider=provider)
+        else:
+            msg = t("llm.auth_rejected").format(provider=provider)
         if detail:
-            msg += f" — {detail}"
-        msg += ". Check Model Endpoints → {} and re-paste the key.".format(provider)
+            msg += t("llm.auth_detail_suffix").format(detail=detail)
+        msg += t("llm.auth_check_endpoint").format(provider=provider)
         return msg
     if status == 404:
-        return f"{provider} returned 404 — check the base URL and model name." + (f" ({detail})" if detail else "")
+        base = t("llm.not_found_404").format(provider=provider)
+        if detail:
+            base += t("llm.detail_paren").format(detail=detail)
+        return base
     if status == 429:
-        return f"{provider} rate-limited the request (429)." + (f" {detail}" if detail else "")
+        base = t("llm.rate_limited_upstream").format(provider=provider)
+        if detail:
+            base += f" {detail}"
+        return base
     if status >= 500:
-        return f"{provider} is having an outage (HTTP {status})." + (f" {detail}" if detail else "")
-    return f"{provider} returned HTTP {status}" + (f": {detail}" if detail else "")
+        base = t("llm.outage").format(provider=provider, status=status)
+        if detail:
+            base += f" {detail}"
+        return base
+    base = t("llm.http_status_detail").format(provider=provider, status=status)
+    if detail:
+        base += t("llm.detail_colon").format(detail=detail)
+    return base
 
 # Models that require max_completion_tokens instead of max_tokens
 _MAX_COMPLETION_TOKENS_MODELS = {"o1", "o3", "o4", "gpt-4.5", "gpt-5"}
@@ -1445,9 +1460,9 @@ def llm_call(url: str, model: str, messages: List[Dict], temperature: float = LL
         note_model_activity(target_url, model)
         r = httpx_post_kimi_aware(target_url, h, json=payload, timeout=timeout)
     except Exception as e:
-        raise HTTPException(502, f"POST {target_url} failed: {e}")
+        raise HTTPException(502, t("llm.post_failed").format(url=target_url, error=e))
     if not r.is_success:
-        raise HTTPException(502, f"Upstream {target_url} -> {r.status_code}: {r.text}")
+        raise HTTPException(502, t("llm.upstream_error").format(url=target_url, status=r.status_code, text=r.text))
     data = r.json()
     try:
         if provider == "anthropic":
@@ -1460,7 +1475,7 @@ def llm_call(url: str, model: str, messages: List[Dict], temperature: float = LL
         _set_cached_response(cache_key, response)
         return response
     except Exception:
-        raise HTTPException(502, f"Unexpected schema from {target_url}: {str(data)[:400]}")
+        raise HTTPException(502, t("llm.unexpected_schema").format(url=target_url, data=str(data)[:400]))
 
 
 def _dedupe_candidates(candidates):
@@ -1498,7 +1513,7 @@ def llm_call_with_fallback(candidates, messages, **kwargs) -> str:
     """
     cands = _dedupe_candidates(candidates)
     if not cands:
-        raise HTTPException(503, "No model endpoint configured")
+        raise HTTPException(503, t("llm.no_endpoint"))
     last_err = None
     for i, (url, model, headers) in enumerate(cands):
         try:
@@ -1508,14 +1523,14 @@ def llm_call_with_fallback(candidates, messages, **kwargs) -> str:
             tag = "primary" if i == 0 else "candidate"
             logger.warning(f"[fallback] {tag} {model} failed ({type(e).__name__}); trying next")
             continue
-    raise last_err if last_err else HTTPException(503, "All fallback candidates failed")
+    raise last_err if last_err else HTTPException(503, t("llm.all_fallbacks_failed"))
 
 
 async def llm_call_async_with_fallback(candidates, messages, **kwargs) -> str:
     """Async variant of `llm_call_with_fallback` — same semantics."""
     cands = _dedupe_candidates(candidates)
     if not cands:
-        raise HTTPException(503, "No model endpoint configured")
+        raise HTTPException(503, t("llm.no_endpoint"))
     last_err = None
     for i, (url, model, headers) in enumerate(cands):
         try:
@@ -1525,7 +1540,7 @@ async def llm_call_async_with_fallback(candidates, messages, **kwargs) -> str:
             tag = "primary" if i == 0 else "candidate"
             logger.warning(f"[fallback] {tag} {model} failed ({type(e).__name__}); trying next")
             continue
-    raise last_err if last_err else HTTPException(503, "All fallback candidates failed")
+    raise last_err if last_err else HTTPException(503, t("llm.all_fallbacks_failed"))
 
 
 async def llm_call_async(
@@ -1597,7 +1612,7 @@ async def llm_call_async(
                     continue
                 if event_is_error or data.get("error") or (data.get("status") and data.get("text")):
                     status = int(data.get("status") or 502)
-                    text = data.get("text") or data.get("error") or "ChatGPT Subscription request failed"
+                    text = data.get("text") or data.get("error") or t("llm.chatgpt_request_failed")
                     raise HTTPException(status, text)
                 delta = data.get("delta")
                 if isinstance(delta, str):
@@ -1641,7 +1656,7 @@ async def llm_call_async(
         _apply_local_cache_affinity(payload, url, session_id)
 
     if _is_host_dead(target_url):
-        raise HTTPException(503, f"Upstream {_host_key(target_url)} marked unreachable (cooldown active)")
+        raise HTTPException(503, t("llm.host_unreachable").format(host=_host_key(target_url)))
 
     call_timeout = _call_timeout(timeout)
     attempt = 0
@@ -1677,20 +1692,20 @@ async def llm_call_async(
                 _set_cached_response(cache_key, response)
                 return response
             except Exception:
-                raise HTTPException(502, f"Unexpected schema from {target_url}: {str(data)[:400]}")
+                raise HTTPException(502, t("llm.unexpected_schema").format(url=target_url, data=str(data)[:400]))
         except (httpx.ConnectError, httpx.ConnectTimeout) as e:
             _cooled = _mark_host_dead(target_url)
             duration = time.time() - start
             _tail = f" — host cooled for {DEAD_HOST_COOLDOWN:.0f}s" if _cooled else " — transient, will retry"
             logger.warning(f"LLM async connect to {target_url} failed after {duration:.2f}s: {e}{_tail}")
             if _cooled or attempt >= max_retries:
-                raise HTTPException(503, f"Cannot reach {_host_key(target_url)}: {e}")
+                raise HTTPException(503, t("llm.cannot_reach_with_reason").format(host=_host_key(target_url), error=e))
             await asyncio.sleep(LLMConfig.RETRY_DELAY)
         except (httpx.RequestError, httpx.HTTPStatusError) as e:
             duration = time.time() - start
             logger.warning(f"LLM async call attempt {attempt} failed after {duration:.2f}s: {e}")
             if attempt >= max_retries:
-                raise HTTPException(502, f"POST {target_url} failed after {max_retries} attempts: {e}")
+                raise HTTPException(502, t("llm.post_failed_after_retries").format(url=target_url, retries=max_retries, error=e))
             await asyncio.sleep(LLMConfig.RETRY_DELAY)
 
 async def stream_llm(url: str, model: str, messages: List[Dict], temperature: float = LLMConfig.DEFAULT_TEMPERATURE,
@@ -1775,7 +1790,7 @@ async def stream_llm(url: str, model: str, messages: List[Dict], temperature: fl
     stream_timeout = _stream_timeout(timeout)
 
     if _is_host_dead(target_url):
-        yield f'event: error\ndata: {json.dumps({"error": f"Upstream {_host_key(target_url)} unreachable (cooldown active)", "status": 503})}\n\n'
+        yield f'event: error\ndata: {json.dumps({"error": t("llm.host_unreachable").format(host=_host_key(target_url)), "status": 503})}\n\n'
         return
     note_model_activity(target_url, model)
 
@@ -1831,11 +1846,11 @@ async def stream_llm(url: str, model: str, messages: List[Dict], temperature: fl
             _cooled = _mark_host_dead(target_url)
             _tail = f" — host cooled for {DEAD_HOST_COOLDOWN:.0f}s" if _cooled else " — transient, will retry"
             logger.warning(f"ChatGPT Subscription stream connect to {target_url} failed: {e}{_tail}")
-            yield f'event: error\ndata: {json.dumps({"error": f"Cannot reach {_host_key(target_url)}", "status": 503})}\n\n'
+            yield f'event: error\ndata: {json.dumps({"error": t("llm.cannot_reach").format(host=_host_key(target_url)), "status": 503})}\n\n'
         except httpx.ReadTimeout:
-            yield f'event: error\ndata: {json.dumps({"error": "Read timeout", "status": 504})}\n\n'
+            yield f'event: error\ndata: {json.dumps({"error": t("llm.read_timeout"), "status": 504})}\n\n'
         except httpx.NetworkError:
-            yield f'event: error\ndata: {json.dumps({"error": "Network error", "status": 502})}\n\n'
+            yield f'event: error\ndata: {json.dumps({"error": t("llm.network_error"), "status": 502})}\n\n'
         except Exception as e:
             logger.error(f"ChatGPT Subscription stream error: {e}")
             yield f'event: error\ndata: {json.dumps({"error": str(e), "status": 502})}\n\n'
@@ -1893,11 +1908,11 @@ async def stream_llm(url: str, model: str, messages: List[Dict], temperature: fl
             _cooled = _mark_host_dead(target_url)
             _tail = f" — host cooled for {DEAD_HOST_COOLDOWN:.0f}s" if _cooled else " — transient, will retry"
             logger.warning(f"Ollama stream connect to {target_url} failed: {e}{_tail}")
-            yield f'event: error\ndata: {json.dumps({"error": f"Cannot reach {_host_key(target_url)}", "status": 503})}\n\n'
+            yield f'event: error\ndata: {json.dumps({"error": t("llm.cannot_reach").format(host=_host_key(target_url)), "status": 503})}\n\n'
         except httpx.ReadTimeout:
-            yield f'event: error\ndata: {json.dumps({"error": "Read timeout", "status": 504})}\n\n'
+            yield f'event: error\ndata: {json.dumps({"error": t("llm.read_timeout"), "status": 504})}\n\n'
         except httpx.NetworkError:
-            yield f'event: error\ndata: {json.dumps({"error": "Network error", "status": 502})}\n\n'
+            yield f'event: error\ndata: {json.dumps({"error": t("llm.network_error"), "status": 502})}\n\n'
         except Exception as e:
             logger.error(f"Ollama stream error: {e}")
             yield f'event: error\ndata: {json.dumps({"error": str(e), "status": 502})}\n\n'
@@ -2000,11 +2015,11 @@ async def stream_llm(url: str, model: str, messages: List[Dict], temperature: fl
             _cooled = _mark_host_dead(target_url)
             _tail = f" — host cooled for {DEAD_HOST_COOLDOWN:.0f}s" if _cooled else " — transient, will retry"
             logger.warning(f"Anthropic stream connect to {target_url} failed: {e}{_tail}")
-            yield f'event: error\ndata: {json.dumps({"error": f"Cannot reach {_host_key(target_url)}", "status": 503})}\n\n'
+            yield f'event: error\ndata: {json.dumps({"error": t("llm.cannot_reach").format(host=_host_key(target_url)), "status": 503})}\n\n'
         except httpx.ReadTimeout:
-            yield f'event: error\ndata: {json.dumps({"error": "Read timeout", "status": 504})}\n\n'
+            yield f'event: error\ndata: {json.dumps({"error": t("llm.read_timeout"), "status": 504})}\n\n'
         except httpx.NetworkError:
-            yield f'event: error\ndata: {json.dumps({"error": "Network error", "status": 502})}\n\n'
+            yield f'event: error\ndata: {json.dumps({"error": t("llm.network_error"), "status": 502})}\n\n'
         except Exception as e:
             logger.error(f"Anthropic stream error: {e}")
             yield f'event: error\ndata: {json.dumps({"error": str(e), "status": 502})}\n\n'
@@ -2270,11 +2285,11 @@ async def stream_llm(url: str, model: str, messages: List[Dict], temperature: fl
         _cooled = _mark_host_dead(target_url)
         _tail = f" — host cooled for {DEAD_HOST_COOLDOWN:.0f}s" if _cooled else " — transient, will retry"
         logger.warning(f"Stream connect to {target_url} failed: {e}{_tail}")
-        yield f'event: error\ndata: {json.dumps({"error": f"Cannot reach {_host_key(target_url)}", "status": 503})}\n\n'
+        yield f'event: error\ndata: {json.dumps({"error": t("llm.cannot_reach").format(host=_host_key(target_url)), "status": 503})}\n\n'
     except httpx.ReadTimeout:
-        yield f'event: error\ndata: {json.dumps({"error": "Read timeout", "status": 504})}\n\n'
+        yield f'event: error\ndata: {json.dumps({"error": t("llm.read_timeout"), "status": 504})}\n\n'
     except httpx.NetworkError:
-        yield f'event: error\ndata: {json.dumps({"error": "Network error", "status": 502})}\n\n'
+        yield f'event: error\ndata: {json.dumps({"error": t("llm.network_error"), "status": 502})}\n\n'
     except Exception as e:
         logger.error(f"Stream error: {e}")
         yield f'event: error\ndata: {json.dumps({"error": str(e), "status": 502})}\n\n'
@@ -2284,7 +2299,7 @@ def _summarize_stream_error(err_chunk: Optional[str]) -> str:
     """Pull a short human reason out of an `event: error` SSE chunk for the
     fallback notice. Returns a generic message if it can't be parsed."""
     if not err_chunk:
-        return "primary model failed"
+        return t("llm.primary_model_failed")
     try:
         for line in err_chunk.split("\n"):
             if line.startswith("data: "):
@@ -2292,10 +2307,10 @@ def _summarize_stream_error(err_chunk: Optional[str]) -> str:
                 txt = j.get("text") or j.get("error") or ""
                 status = j.get("status")
                 msg = (f"HTTP {status}: " if status else "") + str(txt)
-                return msg[:200].strip() or "primary model failed"
+                return msg[:200].strip() or t("llm.primary_model_failed")
     except Exception:
         pass
-    return "primary model failed"
+    return t("llm.primary_model_failed")
 
 
 async def stream_llm_with_fallback(candidates, messages, **kwargs):
@@ -2313,7 +2328,7 @@ async def stream_llm_with_fallback(candidates, messages, **kwargs):
     """
     cands = _dedupe_candidates(candidates)
     if not cands:
-        yield f'event: error\ndata: {json.dumps({"error": "No model endpoint configured", "status": 503})}\n\n'
+        yield f'event: error\ndata: {json.dumps({"error": t("llm.no_endpoint"), "status": 503})}\n\n'
         return
 
     primary_model = cands[0][1]

@@ -50,13 +50,15 @@ from fastapi.staticfiles import StaticFiles
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.middleware.gzip import GZipMiddleware
 
+from core.translations import t
+
 # Core imports
 from core.constants import (
     BASE_DIR, STATIC_DIR, SESSIONS_FILE,
     REQUEST_TIMEOUT, OPENAI_API_KEY, AUTH_FILE,
 )
 from core.database import SessionLocal, ApiToken
-from core.middleware import SecurityHeadersMiddleware, is_cors_preflight
+from core.middleware import SecurityHeadersMiddleware, LanguageMiddleware, is_cors_preflight
 from core.auth import AuthManager, normalize_known_username
 from core.exceptions import (
     SessionNotFoundError, InvalidFileUploadError,
@@ -146,6 +148,7 @@ app.add_middleware(GZipMiddleware, minimum_size=1024, compresslevel=6)
 
 # ========= SECURITY HEADERS MIDDLEWARE =========
 app.add_middleware(SecurityHeadersMiddleware)
+app.add_middleware(LanguageMiddleware)
 
 
 # ========= REQUEST TIMEOUT (FALLBACK FOR HUNG HANDLERS) =========
@@ -182,7 +185,7 @@ class _RequestTimeoutMiddleware(_BaseHTTPMiddleware):
             return await _asyncio.wait_for(call_next(request), timeout=REQUEST_HARD_TIMEOUT)
         except _asyncio.TimeoutError:
             return _JSONResponse(
-                {"detail": f"Request exceeded {REQUEST_HARD_TIMEOUT:.0f}s timeout"},
+                {"detail": t("common.errors.timeout").format(seconds=int(REQUEST_HARD_TIMEOUT))},
                 status_code=504,
             )
 
@@ -346,7 +349,7 @@ if AUTH_ENABLED:
                 # No users yet — redirect to login for first-time setup
                 if not path.startswith("/api/"):
                     return RedirectResponse(url="/login", status_code=302)
-                return JSONResponse(status_code=401, content={"error": "Setup required"})
+                return JSONResponse(status_code=401, content={"error": t("auth.setup_required")})
 
             # --- Bearer token auth (API tokens for external integrations) ---
             auth_header = request.headers.get("authorization", "")
@@ -354,7 +357,7 @@ if AUTH_ENABLED:
                 raw_token = auth_header[7:]
                 # Sanity check: tokens are "ody_" + 43 chars of base64
                 if len(raw_token) < 12 or len(raw_token) > 100:
-                    return JSONResponse(status_code=401, content={"error": "Invalid API token"})
+                    return JSONResponse(status_code=401, content={"error": t("auth.invalid_token")})
                 prefix = raw_token[:8]
                 try:
                     if app.state._token_cache_dirty:
@@ -400,13 +403,13 @@ if AUTH_ENABLED:
                 except Exception:
                     logger.warning("API token auth error", exc_info=False)
                 # Invalid bearer token — reject immediately
-                return JSONResponse(status_code=401, content={"error": "Invalid API token"})
+                return JSONResponse(status_code=401, content={"error": t("auth.invalid_token")})
 
             # --- Cookie-based session auth ---
             token = request.cookies.get(SESSION_COOKIE)
             if not auth_manager.validate_token(token):
                 if path.startswith("/api/"):
-                    return JSONResponse(status_code=401, content={"error": "Not authenticated"})
+                    return JSONResponse(status_code=401, content={"error": t("auth.not_authenticated")})
                 return RedirectResponse(url="/login", status_code=302)
 
             # Attach current username to request state for downstream routes
@@ -460,7 +463,7 @@ async def serve_generated_image(filename: str, request: Request):
                 # Generated-but-not-yet-imported images have no row → allow.
                 # Row exists with a different owner → 404 (don't confirm existence).
                 if _row is not None and _row.owner and _row.owner != _user:
-                    raise HTTPException(status_code=404, detail="Image not found")
+                    raise HTTPException(status_code=404, detail=t("generated_images.not_found"))
             finally:
                 _db.close()
     except HTTPException:
@@ -807,7 +810,7 @@ async def serve_index(request: Request):
     root_path = abs_join(BASE_DIR, "index.html")
     if os.path.exists(root_path):
         return _serve_html_with_nonce(request, root_path)
-    raise HTTPException(404, "index.html not found")
+    raise HTTPException(404, t("common.not_found"))
 
 @app.get("/notes")
 async def serve_notes(request: Request):

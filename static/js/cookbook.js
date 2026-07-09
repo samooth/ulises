@@ -3,6 +3,7 @@
 // What Fits? + Saved presets, inline action panels
 // ============================================
 
+import { t } from './i18n.js';
 import uiModule from './ui.js';
 import spinnerModule from './spinner.js';
 import { providerLogo } from './providers.js';
@@ -1168,7 +1169,7 @@ async function _fetchDependencies() {
           // disappearing before the user could read multi-clause errors
           // like "tmux missing on remote".
           const reason = data.detail || data.error || `HTTP ${res.status}`;
-          uiModule.showToast('Install failed: ' + String(reason).slice(0, 400), {
+          uiModule.showToast(t('cookbook.installFailed', { reason: String(reason).slice(0, 400) }), {
             duration: 20000,
             action: 'OK',
             onAction: () => {},
@@ -1180,9 +1181,9 @@ async function _fetchDependencies() {
         const payload = { repo_id: pipName, _cmd: cmd, remote_host: _envState.remoteHost || '', _dep: true, env_path: _envState.envPath || '' };
         _addTask(data.session_id, 'pip ' + pkgName, 'download', payload);
         if (statusEl) { statusEl.textContent = upgrade ? 'Updating...' : 'Installing...'; statusEl.disabled = true; }
-        uiModule.showToast(`${upgrade ? 'Updating' : 'Installing'} ${pkgName} on ${targetHost}...`);
+        uiModule.showToast(t(upgrade ? 'cookbook.updatingPkg' : 'cookbook.installingPkg', { pkg: pkgName, host: targetHost }));
       } catch (err) {
-        uiModule.showToast('Install failed: ' + err.message, {
+        uiModule.showToast(t('cookbook.installFailed', { reason: err.message }), {
           duration: 20000,
           action: 'OK',
           onAction: () => {},
@@ -1240,14 +1241,14 @@ async function _fetchDependencies() {
           if (res.ok && data.ok) {
             const payload = { repo_id: 'pip llama-cpp-python[CUDA]', _cmd: cmd, remote_host: _envState.remoteHost || '', _dep: true };
             _addTask(data.session_id, 'pip llama-cpp-python[CUDA]', 'download', payload);
-            uiModule.showToast(`Reinstalling llama-cpp-python with CUDA wheels on ${targetLabel} (~1-3 min)…`, 4000);
+            uiModule.showToast(t('cookbook.reinstallingCudaWheels', { target: targetLabel }), 4000);
           } else {
-            uiModule.showToast('Upgrade failed: ' + String(data.detail || data.error || `HTTP ${res.status}`).slice(0, 300), {
+            uiModule.showToast(t('cookbook.upgradeFailed', { reason: String(data.detail || data.error || `HTTP ${res.status}`).slice(0, 300) }), {
               duration: 20000, action: 'OK', onAction: () => {},
             });
           }
         } catch (err) {
-          uiModule.showToast('Upgrade request failed: ' + err.message, { duration: 20000, action: 'OK', onAction: () => {} });
+          uiModule.showToast(t('cookbook.upgradeRequestFailed', { reason: err.message }), { duration: 20000, action: 'OK', onAction: () => {} });
         }
       });
     });
@@ -1306,7 +1307,7 @@ async function _fetchDependencies() {
           });
           const data = await res.json().catch(() => ({}));
           if (res.ok && data.ok) {
-            uiModule.showToast(`Installed ${names.join(', ')} on ${targetLabel}. Refreshing…`, 4000);
+            uiModule.showToast(t('cookbook.installedDeps', { names: names.join(', '), target: targetLabel }), 4000);
             // Refresh the deps panel so the row updates (prereqs now present).
             try { await _fetchDependencies(); } catch {}
           } else {
@@ -1315,7 +1316,7 @@ async function _fetchDependencies() {
             // from the row) so the user can copy-paste it without leaving
             // the toast. Otherwise just surface the error.
             const _suffix = _resolvedCmd ? `\n\nRun on ${targetLabel}: ${_resolvedCmd}` : '';
-            uiModule.showToast('Build-deps install failed: ' + String(reason).slice(0, 300) + _suffix, {
+            uiModule.showToast(t('cookbook.buildDepsInstallFailed', { reason: String(reason).slice(0, 300), suffix: _suffix }), {
               duration: 25000,
               action: _resolvedCmd ? 'Copy command' : 'OK',
               onAction: async () => {
@@ -1328,9 +1329,9 @@ async function _fetchDependencies() {
             btn.disabled = false;
           }
         } catch (err) {
-          uiModule.showToast('Install request failed: ' + err.message, {
-            duration: 20000, action: 'OK', onAction: () => {},
-          });
+uiModule.showToast(t('cookbook.installRequestFailed', { reason: err.message }), {
+          duration: 20000, action: 'OK', onAction: () => {},
+        });
           btn.textContent = origText;
           btn.disabled = false;
         }
@@ -1402,7 +1403,7 @@ async function _fetchDependencies() {
         if (!pre) return;
         try {
           await navigator.clipboard.writeText(pre.textContent);
-          uiModule.showToast('Copied');
+          uiModule.showToast(t('common.copied'));
         } catch {
           // Fallback for non-secure contexts: select the pre's text so
           // the user can Ctrl+C themselves.
@@ -1453,14 +1454,14 @@ async function _fetchDependencies() {
           });
           const data = await res.json().catch(() => ({}));
           if (!res.ok || !data.ok) {
-            uiModule.showToast('Run failed: ' + String(data.detail || data.error || `HTTP ${res.status}`).slice(0, 200));
+            uiModule.showToast(t('cookbook.runFailed', { reason: String(data.detail || data.error || `HTTP ${res.status}`).slice(0, 200) }));
             return;
           }
           const payload = { repo_id: `${backend} setup`, _cmd: cmd, remote_host: _envState.remoteHost || '', _dep: true };
           _addTask(data.session_id, `${backend} setup`, 'download', payload);
-          uiModule.showToast(`Running ${backend} setup on ${targetHost}…`);
+          uiModule.showToast(t('cookbook.runningSetup', { backend, host: targetHost }));
         } catch (err) {
-          uiModule.showToast('Run failed: ' + err.message);
+          uiModule.showToast(t('cookbook.runFailed', { reason: err.message }));
         }
       });
     });
@@ -1495,14 +1496,14 @@ async function _fetchDependencies() {
         const data = await res.json().catch(() => ({}));
         if (!res.ok || !data.ok) {
           const reason = data.detail || data.error || `HTTP ${res.status}`;
-          uiModule.showToast(`${updateSource ? 'Update' : 'Rebuild'} failed: ` + String(reason).slice(0, 300), {
+          uiModule.showToast(t(updateSource ? 'cookbook.updateFailed' : 'cookbook.rebuildFailed', { reason: String(reason).slice(0, 300) }), {
             duration: 20000, action: 'OK', onAction: () => {},
           });
         } else {
-          uiModule.showToast(`${updateSource ? 'Updated source and cleared' : 'Cleared'} llama.cpp build on ${where}. Re-launch the serve task to rebuild.`);
+          uiModule.showToast(t(updateSource ? 'cookbook.updatedSourceAndCleared' : 'cookbook.clearedBuild', { where }));
         }
       } catch (err) {
-        uiModule.showToast(`${updateSource ? 'Update' : 'Rebuild'} failed: ` + err.message);
+        uiModule.showToast(t(updateSource ? 'cookbook.updateFailed' : 'cookbook.rebuildFailed', { reason: err.message }));
       } finally {
         if (statusEl) {
           statusEl.disabled = false;
@@ -2106,7 +2107,7 @@ function _wireTabEvents(body) {
       // Ollama names (single-segment with a tag) skip this check — they go
       // through `ollama pull` server-side, not snapshot_download.
       if (!ollamaName && !/^[^\s/]+\/[^\s/]+$/.test(repo)) {
-        uiModule.showToast('Enter a full HuggingFace repo ID like "org/model-name", or an Ollama name like "qwen2.5:14b".');
+        uiModule.showToast(t('cookbook.enterFullRepoId'));
         dlInput.focus();
         return;
       }
@@ -2123,10 +2124,10 @@ function _wireTabEvents(body) {
           dlBtn.textContent = oldText;
         }
         if (!pickerInclude) {
-          uiModule.showToast('Pick a GGUF quant first. Ulises will not download the whole GGUF repo without an include pattern.');
+          uiModule.showToast(t('cookbook.pickGgufQuantFirst'));
           return;
         }
-        uiModule.showToast('Pick the GGUF quant, then press Download again.');
+        uiModule.showToast(t('cookbook.pickGgufQuantThenDownload'));
         return;
       }
       // Resolve the host straight from THIS window's server dropdown, by index

@@ -7,6 +7,7 @@
 import themeModule from './theme.js';
 import * as Modals from './modalManager.js';
 import spinnerModule from './spinner.js';
+import { t } from './i18n.js';
 import { registerMenuDismiss, dismissTopMenu, dismissOrRemove } from './escMenuStack.js';
 import { nextToolWindowZ, topToolWindowZ } from './toolWindowZOrder.js';
 
@@ -220,7 +221,7 @@ _initHoverCardSpaceToggle();
 export async function copyToClipboard(text) {
   try {
     await navigator.clipboard.writeText(text);
-    showToast('Copied');
+    showToast(t('common.copied'));
   }
   catch {
     const ta = document.createElement('textarea');
@@ -230,7 +231,7 @@ export async function copyToClipboard(text) {
     ta.select();
     document.execCommand('copy');
     document.body.removeChild(ta);
-    showToast('Copied');
+    showToast(t('common.copied'));
   }
 }
 

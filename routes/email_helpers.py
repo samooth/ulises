@@ -36,6 +36,7 @@ from typing import Optional, List
 
 from src.auth_helpers import _auth_disabled, get_current_user
 from src.secret_storage import decrypt as _decrypt
+from core.translations import t
 
 logger = logging.getLogger(__name__)
 
@@ -161,7 +162,7 @@ def _send_smtp_message(cfg: dict, from_addr: str, recipients: list[str], message
         if cfg.get("oauth_provider") == "google":
             token = _get_valid_google_token(cfg.get("account_id"), cfg)
             if not token:
-                raise RuntimeError("Google OAuth token unavailable — reconnect the account")
+                raise RuntimeError(t("email.oauth_token_unavailable"))
             smtp.ehlo()
             smtp.auth("XOAUTH2", lambda challenge=None: _xoauth2_raw(user, token), initial_response_ok=True)
         elif user and password:
@@ -206,10 +207,7 @@ def _friendly_email_auth_error(protocol: str, host: str, error: object) -> str:
     )
     if microsoft_basic_auth_failure:
         return (
-            "Microsoft no longer accepts normal mailbox passwords for "
-            "Outlook/Office 365 IMAP/SMTP in most accounts. Ulises "
-            "does not support Microsoft OAuth/Graph mail yet, so Outlook "
-            "accounts cannot be added with this password form."
+            t("email.microsoft_auth_disabled")
         )
     return raw[:200]
 
@@ -294,14 +292,14 @@ def _require_auth(request: Request) -> str:
         return ""
     auth_mgr = getattr(request.app.state, "auth_manager", None)
     if auth_mgr is not None and getattr(auth_mgr, "is_configured", False):
-        raise HTTPException(401, "Not authenticated")
+        raise HTTPException(401, t("email.not_authenticated"))
     # Unconfigured / first-run mode: only allow loopback callers. Public
     # network traffic must authenticate even before auth is set up.
     client = getattr(request, "client", None)
     host = (client.host if client else "") or ""
     if host in ("127.0.0.1", "::1", "localhost"):
         return ""
-    raise HTTPException(401, "Not authenticated")
+    raise HTTPException(401, t("email.not_authenticated"))
 
 
 def require_owner(request: Request, account_id: str | None = Query(None)) -> str:
@@ -337,10 +335,10 @@ def _assert_owns_account(account_id: str, owner: str) -> None:
         try:
             row = db.query(_EA).filter(_EA.id == account_id).first()
             if row is None:
-                raise HTTPException(404, "Account not found")
+                raise HTTPException(404, t("email.account_not_found"))
             if row.owner and row.owner != owner:
                 # Treat as 404 (not 403) so we don't leak existence.
-                raise HTTPException(404, "Account not found")
+                raise HTTPException(404, t("email.account_not_found"))
         finally:
             db.close()
     except HTTPException:
@@ -349,7 +347,7 @@ def _assert_owns_account(account_id: str, owner: str) -> None:
         # Fail closed — a DB hiccup must not let cross-tenant access slip
         # through. 503 tells the caller to retry; logs preserve detail.
         logger.error(f"Account-owner check failed: {e}")
-        raise HTTPException(503, "Account check failed")
+        raise HTTPException(503, t("email.account_check_failed"))
 
 def _q(name: str) -> str:
     """Quote an IMAP mailbox name. Defensive: escapes `\\` and `"` and wraps
@@ -512,7 +510,7 @@ def attachment_extract_dir(folder: str, uid: str) -> Path:
     target = (ATTACHMENTS_DIR / key).resolve()
     base = ATTACHMENTS_DIR.resolve()
     if target != base and base not in target.parents:
-        raise HTTPException(400, "Invalid attachment location")
+        raise HTTPException(400, t("email.invalid_attachment_location"))
     return target
 
 
@@ -945,7 +943,7 @@ def _imap_connect(account_id: str | None = None, owner: str = "",
         if cfg.get("oauth_provider") == "google":
             token = _get_valid_google_token(cfg.get("account_id"), cfg)
             if not token:
-                raise RuntimeError("Google OAuth token unavailable — reconnect the account in Settings → Integrations")
+                raise RuntimeError(t("email.oauth_token_unavailable_imap"))
             conn.authenticate("XOAUTH2", lambda x: _xoauth2_bytes(cfg["imap_user"], token))
         else:
             conn.login(cfg["imap_user"], cfg["imap_password"])

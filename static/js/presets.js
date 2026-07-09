@@ -1,5 +1,7 @@
 // static/js/presets.js
 
+import { t } from './i18n.js';
+
 /**
  * Preset management
  */
@@ -238,7 +240,7 @@ function initNameDropdown() {
       if (!charName || charName === '__default__') return;
       const match = userTemplates.find(t => t.name === charName);
       const isBuiltin = PROMPT_TEMPLATES.some(t => t.name === charName);
-      if (!await window.styledConfirm(`Delete "${charName}"?\n\nThis will remove the persona and all its memories.`, { confirmText: 'Delete', danger: true })) return;
+      if (!await window.styledConfirm(t('presets.deleteConfirm', { name: charName }), { confirmText: t('presets.delete'), danger: true })) return;
       try {
         // Delete saved template if exists
         if (match) {
@@ -530,7 +532,7 @@ export async function loadPresets(showError) {
   } catch (error) {
     console.error('Failed to load presets:', error);
     if (showError) {
-      showError('Failed to load presets');
+      showError(t('presets.loadFailed'));
     }
   }
 }
@@ -843,7 +845,7 @@ export async function saveCustomPreset(showToast, showError) {
 
       if (showToast) {
         // The Inject tab is a plain tuned "prompt" chat, not a persona — say so.
-        showToast(_isInjectStart ? 'Prompt saved' : 'Persona saved');
+        showToast(_isInjectStart ? t('presets.promptSaved') : t('presets.personaSaved'));
       }
       const modal = document.getElementById('custom-preset-modal');
       if (modal) {
@@ -851,13 +853,13 @@ export async function saveCustomPreset(showToast, showError) {
       }
     } else {
       if (showError) {
-        showError('Failed to save custom preset');
+        showError(t('presets.saveFailed'));
       }
     }
   } catch (error) {
     console.error('Error saving custom preset:', error);
     if (showError) {
-      showError('Failed to save custom preset');
+      showError(t('presets.saveFailed'));
     }
   }
 }

@@ -7,7 +7,7 @@ Summarizes older messages via the same LLM, preserving key context.
 
 import json
 import logging
-from typing import Any, Dict, List, Optional
+from typing import Dict, List, Optional
 
 from src.model_context import get_context_length, estimate_tokens
 from src.llm_core import llm_call_async
@@ -17,7 +17,7 @@ from core.models import ChatMessage
 logger = logging.getLogger(__name__)
 
 
-def _content_as_text(content: Any) -> str:
+def _content_as_text(content: str | list) -> str:
     """Flatten a message's content to plain text.
 
     Handles the three shapes that flow through history: a plain string, a

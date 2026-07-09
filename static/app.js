@@ -3,6 +3,7 @@
 // ES6 module — entry point, no exports (wires all modules together)
 // ============================================
 import Storage from './js/storage.js';
+import { init as i18nInit, setLanguage as i18nSetLanguage, getCurrentLang as i18nGetLang } from './js/i18n.js';
 import uiModule from './js/ui.js';
 import workspaceModule from './js/workspace.js';
 import fileHandlerModule from './js/fileHandler.js';
@@ -3360,6 +3361,8 @@ function startUlisesApp() {
   window.__ulisesAppStarted = true;
   // Set CSS variables
   document.documentElement.style.setProperty('--line-height', '20px');
+  // Initialize i18n (lazy — does not block other init)
+  i18nInit().catch(e => console.warn('[i18n] Init failed, using English:', e));
 
   // Smooth keyboard open/close on mobile — keep chat scrolled to bottom
   if (window.visualViewport && 'ontouchstart' in window) {

@@ -1408,46 +1408,53 @@ def _migrate_add_task_automation_columns():
             )
             if needs_rebuild:
                 logging.getLogger(__name__).info("Rebuilding scheduled_tasks to make prompt/schedule/scheduled_time nullable")
-                conn.execute(text("ALTER TABLE scheduled_tasks RENAME TO _old_scheduled_tasks"))
-                conn.execute(text("""
-                    CREATE TABLE scheduled_tasks (
-                        id VARCHAR PRIMARY KEY,
-                        owner VARCHAR,
-                        name VARCHAR NOT NULL,
-                        prompt TEXT,
-                        schedule VARCHAR,
-                        scheduled_time VARCHAR,
-                        scheduled_day INTEGER,
-                        scheduled_date DATETIME,
-                        next_run DATETIME,
-                        last_run DATETIME,
-                        status VARCHAR,
-                        output_target VARCHAR,
-                        session_id VARCHAR,
-                        model VARCHAR,
-                        endpoint_url VARCHAR,
-                        run_count INTEGER,
-                        created_at DATETIME NOT NULL,
-                        updated_at DATETIME NOT NULL,
-                        task_type VARCHAR DEFAULT 'llm',
-                        action VARCHAR,
-                        trigger_type VARCHAR DEFAULT 'schedule',
-                        trigger_event VARCHAR,
-                        trigger_count INTEGER,
-                        trigger_counter INTEGER DEFAULT 0
-                    )
-                """))
-                conn.execute(text("""
-                    INSERT INTO scheduled_tasks
-                    SELECT id, owner, name, prompt, schedule, scheduled_time,
-                           scheduled_day, scheduled_date, next_run, last_run,
-                           status, output_target, session_id, model, endpoint_url,
-                           run_count, created_at, updated_at,
-                           task_type, action, trigger_type, trigger_event,
-                           trigger_count, trigger_counter
-                    FROM _old_scheduled_tasks
-                """))
-                conn.execute(text("DROP TABLE _old_scheduled_tasks"))
+                # Disable FK enforcement temporarily — the table rename + drop
+                # would otherwise fail because task_runs.task_id FK references
+                # scheduled_tasks.id. Re-enable after the swap.
+                conn.execute(text("PRAGMA foreign_keys=OFF"))
+                try:
+                    conn.execute(text("ALTER TABLE scheduled_tasks RENAME TO _old_scheduled_tasks"))
+                    conn.execute(text("""
+                        CREATE TABLE scheduled_tasks (
+                            id VARCHAR PRIMARY KEY,
+                            owner VARCHAR,
+                            name VARCHAR NOT NULL,
+                            prompt TEXT,
+                            schedule VARCHAR,
+                            scheduled_time VARCHAR,
+                            scheduled_day INTEGER,
+                            scheduled_date DATETIME,
+                            next_run DATETIME,
+                            last_run DATETIME,
+                            status VARCHAR,
+                            output_target VARCHAR,
+                            session_id VARCHAR,
+                            model VARCHAR,
+                            endpoint_url VARCHAR,
+                            run_count INTEGER,
+                            created_at DATETIME NOT NULL,
+                            updated_at DATETIME NOT NULL,
+                            task_type VARCHAR DEFAULT 'llm',
+                            action VARCHAR,
+                            trigger_type VARCHAR DEFAULT 'schedule',
+                            trigger_event VARCHAR,
+                            trigger_count INTEGER,
+                            trigger_counter INTEGER DEFAULT 0
+                        )
+                    """))
+                    conn.execute(text("""
+                        INSERT INTO scheduled_tasks
+                        SELECT id, owner, name, prompt, schedule, scheduled_time,
+                               scheduled_day, scheduled_date, next_run, last_run,
+                               status, output_target, session_id, model, endpoint_url,
+                               run_count, created_at, updated_at,
+                               task_type, action, trigger_type, trigger_event,
+                               trigger_count, trigger_counter
+                        FROM _old_scheduled_tasks
+                    """))
+                    conn.execute(text("DROP TABLE _old_scheduled_tasks"))
+                finally:
+                    conn.execute(text("PRAGMA foreign_keys=ON"))
 
             conn.commit()
             logging.getLogger(__name__).info("Task automation columns migration complete")

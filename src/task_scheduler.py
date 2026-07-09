@@ -613,6 +613,7 @@ class TaskScheduler:
                     owners.add(r[0])
             return sorted(owners)
         except Exception:
+            logger.debug("Failed to query task owners", exc_info=True)
             return []
         finally:
             db.close()

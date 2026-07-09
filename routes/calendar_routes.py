@@ -12,6 +12,7 @@ from sqlalchemy import or_, and_
 from dateutil.rrule import rrulestr
 
 from core.database import SessionLocal, CalendarCal, CalendarDeletedEvent, CalendarEvent
+from core.translations import t
 from src.auth_helpers import require_user
 from src.upload_limits import read_upload_limited, ICS_MAX_BYTES
 
@@ -62,24 +63,24 @@ def _require_user(request: Request) -> str:
 def _get_or_404_calendar(db, cal_id: str, owner: str) -> CalendarCal:
     cal = db.query(CalendarCal).filter(CalendarCal.id == cal_id).first()
     if not cal:
-        raise HTTPException(404, "Calendar not found")
+        raise HTTPException(404, t("calendar.not_found"))
     # Tighten the legacy null-owner gate (v2 review HIGH-12): if the
     # caller is authenticated AND the calendar's owner is null OR
     # belongs to a different user, treat it as not-found. The previous
     # rule (`if cal.owner and cal.owner != owner`) silently allowed any
     # authenticated user to read/edit any calendar with owner=None.
     if owner and (cal.owner is None or cal.owner != owner):
-        raise HTTPException(404, "Calendar not found")
+        raise HTTPException(404, t("calendar.not_found"))
     return cal
 
 
 def _get_or_404_event(db, uid: str, owner: str) -> CalendarEvent:
     ev = db.query(CalendarEvent).join(CalendarCal).filter(CalendarEvent.uid == uid).first()
     if not ev:
-        raise HTTPException(404, "Event not found")
+        raise HTTPException(404, t("calendar.event_not_found"))
     cal = ev.calendar
     if owner and cal and (cal.owner is None or cal.owner != owner):
-        raise HTTPException(404, "Event not found")
+        raise HTTPException(404, t("calendar.event_not_found"))
     return ev
 
 
@@ -749,7 +750,7 @@ def setup_calendar_routes() -> APIRouter:
         except ValueError as e:
             raise HTTPException(400, str(e))
         if not body.get("password"):
-            raise HTTPException(400, "Password is required")
+            raise HTTPException(400, t("calendar.password_required"))
         from src.secret_storage import encrypt
         new_acc = {
             "id": str(_uuid.uuid4()),
@@ -774,7 +775,7 @@ def setup_calendar_routes() -> APIRouter:
         accounts = _get_caldav_accounts(owner)
         idx = next((i for i, a in enumerate(accounts) if a.get("id") == account_id), None)
         if idx is None:
-            raise HTTPException(404, "Account not found")
+            raise HTTPException(404, t("calendar.account_not_found"))
         acc = dict(accounts[idx])
         if body.get("url"):
             from src.caldav_sync import validate_caldav_url
@@ -800,7 +801,7 @@ def setup_calendar_routes() -> APIRouter:
         accounts = _get_caldav_accounts(owner)
         new_accounts = [a for a in accounts if a.get("id") != account_id]
         if len(new_accounts) == len(accounts):
-            raise HTTPException(404, "Account not found")
+            raise HTTPException(404, t("calendar.account_not_found"))
         _save_caldav_accounts(owner, new_accounts)
         return {"ok": True}
 
@@ -838,7 +839,7 @@ def setup_calendar_routes() -> APIRouter:
                         except Exception:
                             pass
         if not (url and user and pw):
-            return {"ok": False, "error": "Missing URL, username, or password"}
+            return {"ok": False, "error": t("calendar.missing_credentials")}
         from src.caldav_sync import validate_caldav_url
         try:
             url = validate_caldav_url(url)
@@ -875,18 +876,18 @@ def setup_calendar_routes() -> APIRouter:
             if r.status_code in (200, 207):
                 return {"ok": True}
             if r.status_code == 401:
-                return {"ok": False, "error": "Auth failed — check username/password"}
+                return {"ok": False, "error": t("calendar.auth_failed")}
             if r.status_code == 403:
-                return {"ok": False, "error": "Forbidden — user can't access that URL"}
+                return {"ok": False, "error": t("calendar.forbidden")}
             if r.status_code == 404:
-                return {"ok": False, "error": "Not found — check the URL path"}
+                return {"ok": False, "error": t("calendar.not_found_url")}
             if 300 <= r.status_code < 400:
-                return {"ok": False, "error": "Redirects are not followed for CalDAV safety; use the final URL"}
-            return {"ok": False, "error": f"HTTP {r.status_code}"}
+                return {"ok": False, "error": t("calendar.redirect_not_followed")}
+            return {"ok": False, "error": t("calendar.http_error")}
         except httpx.ConnectError as e:
-            return {"ok": False, "error": f"Connection refused: {e}"[:200]}
+            return {"ok": False, "error": t("calendar.connection_refused")}
         except httpx.TimeoutException:
-            return {"ok": False, "error": "Connection timed out"}
+            return {"ok": False, "error": t("calendar.connection_timed_out")}
         except Exception as e:
             return {"ok": False, "error": str(e)[:200]}
 
@@ -915,7 +916,7 @@ def setup_calendar_routes() -> APIRouter:
         except Exception as e:
             db.rollback()
             logger.error("Failed to delete calendar %s: %s", cal_id, e)
-            raise HTTPException(500, "Failed to delete calendar")
+            raise HTTPException(500, t("calendar.delete_calendar_failed"))
         finally:
             db.close()
 
@@ -935,7 +936,7 @@ def setup_calendar_routes() -> APIRouter:
             raise
         except Exception as e:
             logger.error("Failed to list calendars: %s", e)
-            raise HTTPException(500, "Failed to list calendars")
+            raise HTTPException(500, t("calendar.list_calendars_failed"))
         finally:
             db.close()
 
@@ -1001,7 +1002,7 @@ def setup_calendar_routes() -> APIRouter:
             raise
         except Exception as e:
             logger.error("Failed to list events: %s", e)
-            raise HTTPException(500, "Failed to list events")
+            raise HTTPException(500, t("calendar.list_events_failed"))
         finally:
             db.close()
 
@@ -1019,7 +1020,7 @@ def setup_calendar_routes() -> APIRouter:
                 # user write events into them. Same null-owner gate as
                 # `_get_or_404_calendar`.
                 if cal and (cal.owner is None or cal.owner != owner):
-                    raise HTTPException(404, "Calendar not found")
+                    raise HTTPException(404, t("calendar.not_found"))
             if not cal:
                 cal = _ensure_default_calendar(db, owner)
 
@@ -1062,7 +1063,7 @@ def setup_calendar_routes() -> APIRouter:
         except Exception as e:
             db.rollback()
             logger.error("Failed to create event: %s", e)
-            raise HTTPException(500, "Failed to create event")
+            raise HTTPException(500, t("calendar.create_failed"))
         finally:
             db.close()
 
@@ -1113,7 +1114,7 @@ def setup_calendar_routes() -> APIRouter:
         except Exception as e:
             db.rollback()
             logger.error("Failed to update event: %s", e)
-            raise HTTPException(500, "Failed to update event")
+            raise HTTPException(500, t("calendar.update_failed"))
         finally:
             db.close()
 
@@ -1140,7 +1141,7 @@ def setup_calendar_routes() -> APIRouter:
         except Exception as e:
             db.rollback()
             logger.error("Failed to delete event: %s", e)
-            raise HTTPException(500, "Failed to delete event")
+            raise HTTPException(500, t("calendar.delete_failed"))
         finally:
             db.close()
 
@@ -1162,7 +1163,7 @@ def setup_calendar_routes() -> APIRouter:
         except Exception as e:
             db.rollback()
             logger.error("Failed to create calendar: %s", e)
-            raise HTTPException(500, "Failed to create calendar")
+            raise HTTPException(500, t("calendar.create_calendar_failed"))
         finally:
             db.close()
 
@@ -1183,7 +1184,7 @@ def setup_calendar_routes() -> APIRouter:
         except Exception as e:
             db.rollback()
             logger.error("Failed to update calendar: %s", e)
-            raise HTTPException(500, "Failed to update calendar")
+            raise HTTPException(500, t("calendar.update_calendar_failed"))
         finally:
             db.close()
 
@@ -1204,7 +1205,7 @@ def setup_calendar_routes() -> APIRouter:
             try:
                 cal_data = iCal.from_ical(content)
             except Exception as e:
-                raise HTTPException(400, f"Invalid ICS file: {e}")
+                raise HTTPException(400, t("calendar.ics_import_failed"))
 
             # Sanitize display name — length cap + strip control chars
             raw_name = calendar_name.strip() or (file.filename or "").replace(".ics", "").replace("_", " ").strip() or "Imported"
@@ -1323,7 +1324,7 @@ def setup_calendar_routes() -> APIRouter:
         except Exception as e:
             db.rollback()
             logger.error("Failed to import ICS: %s", e)
-            raise HTTPException(500, "Failed to import ICS")
+            raise HTTPException(500, t("calendar.ics_import_failed"))
         finally:
             db.close()
 
@@ -1381,7 +1382,7 @@ def setup_calendar_routes() -> APIRouter:
             raise
         except Exception as e:
             logger.error("Failed to export ICS: %s", e)
-            raise HTTPException(500, "Failed to export ICS")
+            raise HTTPException(500, t("calendar.ics_export_failed"))
         finally:
             db.close()
 
@@ -1407,7 +1408,7 @@ def setup_calendar_routes() -> APIRouter:
         body = await request.json()
         text = (body.get("text") or "").strip()
         if not text:
-            raise HTTPException(400, "text is required")
+            raise HTTPException(400, t("calendar.text_required"))
         from src.user_time import (
             clear_user_time_context,
             current_datetime_prompt,
@@ -1427,7 +1428,7 @@ def setup_calendar_routes() -> APIRouter:
         if not url:
             url, model, headers = resolve_endpoint("default", owner=owner or None)
         if not url or not model:
-            return {"ok": False, "error": "No LLM endpoint configured"}
+            return {"ok": False, "error": t("calendar.no_llm")}
 
         now = now_user_local()
         now_iso = now.strftime("%Y-%m-%dT%H:%M:%S")
@@ -1468,17 +1469,17 @@ def setup_calendar_routes() -> APIRouter:
                 timeout=20,
             )
         except Exception as e:
-            return {"ok": False, "error": f"LLM call failed: {e}"}
+            return {"ok": False, "error": t("calendar.llm_failed")}
 
         cleaned = strip_think(raw or "", prose=False, prompt_echo=True)
         cleaned = _re.sub(r"^```(?:json)?\s*|\s*```$", "", cleaned, flags=_re.MULTILINE).strip()
         m = _re.search(r"\{[\s\S]*\}", cleaned)
         if not m:
-            return {"ok": False, "error": "Could not extract JSON", "raw": cleaned[:400]}
+            return {"ok": False, "error": t("calendar.could_not_extract_json"), "raw": cleaned[:400]}
         try:
             parsed = _json.loads(m.group())
         except Exception as e:
-            return {"ok": False, "error": f"Invalid JSON: {e}", "raw": cleaned[:400]}
+            return {"ok": False, "error": t("calendar.invalid_json"), "raw": cleaned[:400]}
 
         # Light validation / defaults so the frontend can trust the shape.
         summary = (parsed.get("summary") or text)[:200]
@@ -1516,7 +1517,7 @@ def setup_calendar_routes() -> APIRouter:
         dtstart = _strip_tz(dtstart)
         dtend   = _strip_tz(dtend)
         if not dtstart:
-            return {"ok": False, "error": "Model did not produce a start time", "raw": cleaned[:400]}
+            return {"ok": False, "error": t("calendar.no_start_time"), "raw": cleaned[:400]}
         if not dtend:
             # Auto-fill +60 min for timed events; +0 for all-day (single-day).
             try:

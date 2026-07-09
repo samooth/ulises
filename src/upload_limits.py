@@ -4,6 +4,8 @@ import os
 
 from fastapi import HTTPException, UploadFile
 
+from core.translations import t
+
 DEFAULT_CHAT_UPLOAD_MAX_BYTES = 10 * 1024 * 1024
 CHAT_UPLOAD_MAX_BYTES_ENV = "ULISES_CHAT_UPLOAD_MAX_BYTES"
 
@@ -67,6 +69,6 @@ async def read_upload_limited(upload: UploadFile, limit: int, label: str = "Uplo
     if len(data) > limit:
         raise HTTPException(
             status_code=413,
-            detail=f"{label} exceeds {format_byte_limit(limit)} limit",
+            detail=t("upload.file_too_large"),
         )
     return data

@@ -18,6 +18,7 @@ from pydantic import BaseModel
 from fastapi.responses import StreamingResponse
 from core.database import SessionLocal, ModelEndpoint, Session as DbSession
 from core.middleware import require_admin
+from core.translations import t
 from src.llm_core import _detect_provider, _host_match, ANTHROPIC_MODELS
 from src.tls_overrides import llm_verify
 from src.settings import load_settings as _load_settings, save_settings as _save_settings
@@ -1317,21 +1318,21 @@ def setup_model_routes(model_discovery):
             if getattr(request.state, "api_token", False):
                 scopes = set(getattr(request.state, "api_token_scopes", []) or [])
                 if "chat" not in scopes:
-                    raise HTTPException(403, "API token is not scoped for chat")
+                    raise HTTPException(403, detail=t("admin.api_token_not_scoped"))
                 if not getattr(request.state, "api_token_owner", None):
-                    raise HTTPException(403, "API token has no owner")
+                    raise HTTPException(403, detail=t("admin.api_token_no_owner"))
             owner = effective_user(request) or ""
 
             # Reject anonymous in configured deployments — no leaking the model
             # list to unauthenticated callers.
             auth_mgr = getattr(request.app.state, "auth_manager", None)
             if not owner and not _auth_disabled() and auth_mgr is not None and getattr(auth_mgr, "is_configured", False):
-                raise HTTPException(401, "Not authenticated")
+                raise HTTPException(401, detail=t("admin.not_authenticated"))
         except HTTPException:
             raise
         except Exception as e:
             logger.error("Auth gate error in GET /api/models, failing closed: %s", e)
-            raise HTTPException(status_code=500, detail="Internal error")
+            raise HTTPException(status_code=500, detail=t("admin.internal_error"))
         # Admins see every endpoint (they manage the global pool); regular
         # users get the owner-scoped view.
         _is_admin = False
@@ -1727,7 +1728,7 @@ def setup_model_routes(model_discovery):
         require_admin(request)
         base_url = _normalize_base(base_url)
         if not base_url:
-            raise HTTPException(400, "Base URL is required")
+            raise HTTPException(400, detail=t("admin.base_url_required"))
         # Resolve hostname via Tailscale if DNS fails
         from src.endpoint_resolver import resolve_url
         base_url = resolve_url(base_url)
@@ -1847,7 +1848,7 @@ def setup_model_routes(model_discovery):
         if (should_probe or requested_kind in ("api", "proxy")) and not model_ids:
             ping = _ping_endpoint(base_url, api_key.strip() or None, timeout=min(explicit_timeout, 10.0))
         if require_model_list and not model_ids:
-            raise HTTPException(400, _model_endpoint_error_message(base_url, ping))
+            raise HTTPException(400, detail=_model_endpoint_error_message(base_url, ping))
 
         ep_id = str(uuid.uuid4())[:8]
         db = SessionLocal()
@@ -1929,7 +1930,7 @@ def setup_model_routes(model_discovery):
         require_admin(request)
         base_url = _normalize_base(base_url)
         if not base_url:
-            raise HTTPException(400, "Base URL is required")
+            raise HTTPException(400, detail=t("admin.base_url_required"))
         from src.endpoint_resolver import resolve_url
         base_url = resolve_url(base_url)
         base_url = _rewrite_loopback_for_docker(base_url)
@@ -1957,7 +1958,7 @@ def setup_model_routes(model_discovery):
         try:
             ep = db.query(ModelEndpoint).filter(ModelEndpoint.id == ep_id).first()
             if not ep:
-                raise HTTPException(404, "Endpoint not found")
+                raise HTTPException(404, detail=t("admin.endpoint_not_found"))
             ep_data = {"id": ep.id, "name": ep.name, "base_url": ep.base_url, "api_key": ep.api_key}
         finally:
             db.close()
@@ -2013,7 +2014,7 @@ def setup_model_routes(model_discovery):
         try:
             ep = db.query(ModelEndpoint).filter(ModelEndpoint.id == ep_id).first()
             if not ep:
-                raise HTTPException(404, "Endpoint not found")
+                raise HTTPException(404, detail=t("admin.endpoint_not_found"))
             hidden = _hidden_model_ids(ep)
             all_models = _cached_model_ids(ep)
             if refresh:
@@ -2064,14 +2065,14 @@ def setup_model_routes(model_discovery):
         try:
             ep = db.query(ModelEndpoint).filter(ModelEndpoint.id == ep_id).first()
             if not ep:
-                raise HTTPException(404, "Endpoint not found")
+                raise HTTPException(404, detail=t("admin.endpoint_not_found"))
             body = await request.json()
             if not isinstance(body, dict):
-                raise HTTPException(400, "Body must be a JSON object")
+                raise HTTPException(400, detail=t("admin.body_must_be_json"))
             if "hidden" in body:
                 hidden = body.get("hidden")
                 if not isinstance(hidden, list):
-                    raise HTTPException(400, "hidden must be a list of model IDs")
+                    raise HTTPException(400, detail=t("admin.hidden_must_be_list"))
                 ep.hidden_models = json.dumps(hidden) if hidden else None
             # Accept either "pinned" or "pinned_models" for the manual IDs list.
             if "pinned_models" in body or "pinned" in body:
@@ -2205,7 +2206,7 @@ def setup_model_routes(model_discovery):
         try:
             ep = db.query(ModelEndpoint).filter(ModelEndpoint.id == ep_id).first()
             if not ep:
-                raise HTTPException(404, "Endpoint not found")
+                raise HTTPException(404, detail=t("admin.endpoint_not_found"))
             if body:
                 if "supports_tools" in body:
                     v = body["supports_tools"]
@@ -2353,7 +2354,7 @@ def setup_model_routes(model_discovery):
         try:
             ep = db.query(ModelEndpoint).filter(ModelEndpoint.id == ep_id).first()
             if not ep:
-                raise HTTPException(404, "Endpoint not found")
+                raise HTTPException(404, detail=t("admin.endpoint_not_found"))
             # Clean up any settings that reference this endpoint
             cleared = _clear_settings_for_endpoint(ep_id)
             cleared_user_preferences = _clear_user_prefs_for_endpoint(ep_id)

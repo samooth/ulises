@@ -5,6 +5,7 @@
  */
 // ES6 module — IIFE removed
 
+import { t } from './i18n.js';
 import Storage from './storage.js';
 import uiModule from './ui.js';
 import sessionModule from './sessions.js';
@@ -1862,7 +1863,7 @@ import { wireArrowUpRecall, getLastUserMessageFromChatHistory } from './composer
                 if (!_isBg) {
                   var _selM = _shortModel(json.selected_model || '');
                   var _ansM = _shortModel(json.answered_by || '');
-                  uiModule.showToast('⚠ ' + _selM + ' failed — answered by ' + _ansM, 6000);
+                  uiModule.showToast(t('chat.model_failed_fallback', { failed: _selM, fallback: _ansM }), 6000);
                   if (holder) {
                     var _rEl = holder.querySelector('.role');
                     if (_rEl) {
@@ -2003,7 +2004,7 @@ import { wireArrowUpRecall, getLastUserMessageFromChatHistory } from './composer
                 holder._memoriesUsed = json.data;
               } else if (json.type === 'compacted') {
                 if (!_isBg) {
-                  uiModule.showToast('Context compacted — older messages summarized');
+                  uiModule.showToast(t('chat.context_compacted'));
                 }
               } else if (json.type === 'metrics') {
                 metrics = json.data;
@@ -4259,7 +4260,7 @@ import { wireArrowUpRecall, getLastUserMessageFromChatHistory } from './composer
 
       await sessionModule.loadSessions();
       await sessionModule.selectSession(data.id);
-      if (uiModule) uiModule.showToast(`Forked → ${data.name}`);
+      if (uiModule) uiModule.showToast(t('chat.forked', { name: data.name }));
     } catch (err) {
       console.error('Fork failed:', err);
       if (uiModule) uiModule.showError('Fork failed: ' + err.message);
@@ -4606,7 +4607,7 @@ import { wireArrowUpRecall, getLastUserMessageFromChatHistory } from './composer
       // error output shown before a model was selected, #1428). Just remove the
       // DOM so the "x" works regardless.
       domToRemove.forEach(el => el.remove());
-      if (uiModule) uiModule.showToast('Message deleted');
+      if (uiModule) uiModule.showToast(t('chat.message_deleted'));
       return;
     }
 
@@ -4618,7 +4619,7 @@ import { wireArrowUpRecall, getLastUserMessageFromChatHistory } from './composer
       });
       if (!res.ok) throw new Error('Server error ' + res.status);
       domToRemove.forEach(el => el.remove());
-      if (uiModule) uiModule.showToast('Message deleted');
+      if (uiModule) uiModule.showToast(t('chat.message_deleted'));
     } catch (err) {
       console.error('Delete failed:', err);
       if (uiModule) uiModule.showError('Delete failed: ' + err.message);
@@ -4703,7 +4704,7 @@ import { wireArrowUpRecall, getLastUserMessageFromChatHistory } from './composer
         }
 
         cleanup();
-        if (uiModule) uiModule.showToast('Message edited');
+        if (uiModule) uiModule.showToast(t('chat.message_edited'));
       } catch (err) {
         console.error('Edit failed:', err);
         if (uiModule) uiModule.showError('Edit failed: ' + err.message);

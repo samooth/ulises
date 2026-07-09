@@ -24,7 +24,7 @@ def _parse_tailscale_status(raw: str) -> Dict[str, Any]:
     return data if isinstance(data, dict) else {}
 
 
-def _first_tailscale_ipv4(value: Any) -> Optional[str]:
+def _first_tailscale_ipv4(value: list) -> Optional[str]:
     if not isinstance(value, list):
         return None
     for ip in value:

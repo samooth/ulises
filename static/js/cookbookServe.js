@@ -4,6 +4,7 @@
 // command building, preset slots, launch logic
 // ============================================
 
+import { t } from './i18n.js';
 import uiModule from './ui.js';
 import spinnerModule from './spinner.js';
 import { providerLogo } from './providers.js';
@@ -972,7 +973,7 @@ function _rerenderCachedModels() {
           if (opt.action === 'serve') item.click();
           else if (opt.action === 'favorite') {
             const favored = _toggleServeFavorite(repo);
-            uiModule.showToast(favored ? 'Favorited — pinned to top' : 'Unfavorited');
+            uiModule.showToast(t(favored ? 'cookbookServe.favoritedPinned' : 'cookbookServe.unfavorited'));
             _rerenderCachedModels();
           }
           else if (opt.action === 'delete') _deleteCachedModel(repo, item, false, m);
@@ -1672,7 +1673,7 @@ function _rerenderCachedModels() {
         if (Number.isFinite(v) && v > cap) {
           _ctxEl0.value = String(cap);
           _ctxEl0.title = `Capped to ${panel._modelCtxMax > 0 ? "this model's trained limit" : "the maximum sane context"} (${cap}).`;
-          if (announce) uiModule.showToast(`Context capped to ${cap}`);
+          if (announce) uiModule.showToast(t('cookbookServe.contextCapped', { cap }));
           updateCmd();
         }
       }
@@ -2129,7 +2130,7 @@ function _rerenderCachedModels() {
           await window.styledConfirm(`This config is already saved as "${_existing.label || 'Unnamed'}".`, { confirmText: 'OK', cancelText: 'Close' });
           return false;
         }
-        if (modelSlots.length >= 5) { uiModule.showToast('Max 5 saves per model'); return false; }
+        if (modelSlots.length >= 5) { uiModule.showToast(t('cookbookServe.maxSavePerModel')); return false; }
         const label = await uiModule.styledPrompt('Name this config so you can recall it later.', {
           title: 'Save Config', placeholder: 'e.g. LoRA, 8-bit, fast', confirmText: 'Save',
         });
@@ -2142,7 +2143,7 @@ function _rerenderCachedModels() {
         });
         presets.push(_redactServeStateForStorage({ name: shortName, model: repo, cmd, remoteHost: host, port: fields.port || '8000', label, fields }));
         _savePresets(presets);
-        uiModule.showToast(`Saved "${label}"`);
+        uiModule.showToast(t('cookbookServe.savedConfig', { label }));
         _updateSavedToggleLabel();
         return true;
       }
@@ -2217,7 +2218,7 @@ function _rerenderCachedModels() {
             _loadSlotIntoPanel(slotIdx);
             // Confirm the click landed — loading is silent otherwise, so it was
             // unclear the settings actually changed.
-            uiModule.showToast(`Loaded "${p.label || `Config ${idx + 1}`}"`);
+            uiModule.showToast(t('cookbookServe.loadedConfig', { label: p.label || `Config ${idx + 1}` }));
             // Briefly flash the command box so the user sees the panel update.
             const _cmdBox = panel.querySelector('.hwfit-serve-cmd');
             if (_cmdBox) {
@@ -2232,7 +2233,7 @@ function _rerenderCachedModels() {
             if (target) {
               target.favorite = !target.favorite;
               _savePresets(cur.map(_redactServeStateForStorage));
-              uiModule.showToast(target.favorite ? 'Favorited — pinned to top' : 'Unfavorited');
+              uiModule.showToast(t(target.favorite ? 'cookbookServe.favoritedPinned' : 'cookbookServe.unfavorited'));
               _showSavedConfigMenu(anchor);
             }
           });
@@ -2247,7 +2248,7 @@ function _rerenderCachedModels() {
               if (gi >= 0) cur.splice(gi, 1);
               _savePresets(cur.map(_redactServeStateForStorage));
             }
-            uiModule.showToast(`Deleted "${label}"`);
+            uiModule.showToast(t('cookbookServe.deletedConfig', { label }));
             _updateSavedToggleLabel();
             _showSavedConfigMenu(anchor);   // rebuild in place
           });
@@ -2311,7 +2312,7 @@ function _rerenderCachedModels() {
               .map(g => g.name));
             if (names.size > 1 && !panel._mixedGpuWarned) {
               panel._mixedGpuWarned = true;   // once per panel, don't nag
-              uiModule.showToast('Mixed GPU types selected — tensor-parallel needs identical GPUs. Pick one pool (e.g. all the same card).', 7000);
+              uiModule.showToast(t('cookbookServe.mixedGpuTypes'), 7000);
             } else if (names.size <= 1) {
               panel._mixedGpuWarned = false;  // reset once they're back to one pool
             }
@@ -2353,7 +2354,7 @@ function _rerenderCachedModels() {
             const cmd = (_cmdManuallyEdited && cmdBox)
               ? cmdBox.value
               : _formatServeCmdPreview(panel._cmd || cmdBox?.value || '');
-            _copyText(cmd).then(() => uiModule.showToast('Launch command copied'));
+            _copyText(cmd).then(() => uiModule.showToast(t('cookbookServe.launchCommandCopied')));
           }));
           menu.appendChild(mk('Schedule', '', () => {
             const direct = new MouseEvent('click', { bubbles: true, cancelable: true });
@@ -2474,10 +2475,10 @@ function _rerenderCachedModels() {
           try { data = await res.json(); } catch (_) { data = {}; }
           if (!res.ok || !data.ok) {
             const err = data.error || data.detail || res.statusText || 'unknown';
-            uiModule.showToast(`Kill PID ${pid} failed: ${err}`, 6000);
+            uiModule.showToast(t('cookbookServe.killPidFailed', { pid, reason: err }), 6000);
             return false;
           }
-          uiModule.showToast(`Sent SIG${sig} to PID ${pid}`, 3000);
+          uiModule.showToast(t('cookbookServe.sentSigToPid', { sig, pid }), 3000);
           return true;
         };
 
@@ -2578,11 +2579,11 @@ function _rerenderCachedModels() {
           if (!res.ok) {
             const err = data.detail || data.error || res.statusText || `HTTP ${res.status}`;
             const hint = res.status === 404 ? ' — server may need a restart to pick up new endpoint' : '';
-            if (!silent) uiModule.showToast('GPU probe failed: ' + err + hint, 8000);
+            if (!silent) uiModule.showToast(t('cookbookServe.gpuProbeFailed', { error: err, hint }), 8000);
             return null;
           }
           if (!data.ok) {
-            if (!silent) uiModule.showToast('GPU probe failed: ' + (data.error || 'unknown'), 6000);
+            if (!silent) uiModule.showToast(t('cookbookServe.gpuProbeFailed', { error: data.error || 'unknown', hint: '' }), 6000);
             return null;
           }
           panel._gpuProbe.byIdx = new Map(data.gpus.map(g => [g.index, g]));
@@ -2646,7 +2647,7 @@ function _rerenderCachedModels() {
           });
           if (!silent) {
             if (data.gpus.length === 0) {
-              uiModule.showToast('No GPU memory probe data available', 4000);
+              uiModule.showToast(t('cookbookServe.noGpuProbeData'), 4000);
             } else {
               const summary = data.gpus.map(g => {
                 const procs = (g.processes && g.processes.length) || 0;
@@ -2660,7 +2661,7 @@ function _rerenderCachedModels() {
 
         _probeBtn.addEventListener('click', async () => {
           try { await _withSpinner(_probeBtn, () => _runProbe(false)); }
-          catch (e) { uiModule.showToast('GPU probe error: ' + e.message, 6000); }
+          catch (e) { uiModule.showToast(t('cookbookServe.gpuProbeError', { reason: e.message }), 6000); }
         });
 
         // Auto-probe (silent) on open so the GPU buttons reflect the real count
@@ -2680,7 +2681,7 @@ function _rerenderCachedModels() {
                   for (const p of (g.processes || [])) pids.push({ pid: p.pid, name: p.name });
                 }
                 if (pids.length === 0) {
-                  uiModule.showToast('No GPU processes to clear', 3000);
+                  uiModule.showToast(t('cookbookServe.noGpuProcesses'), 3000);
                   return;
                 }
                 const summary = pids.map(p => `${p.pid} (${p.name})`).join(', ');
@@ -2695,7 +2696,7 @@ function _rerenderCachedModels() {
                   }).then(r => r.json()).catch(e => ({ ok: false, error: e.message }))
                 ));
                 const okCount = results.filter(r => r.ok).length;
-                uiModule.showToast(`SIGTERM → ${okCount}/${pids.length} processes`, 5000);
+                uiModule.showToast(t('cookbookServe.sigtermResult', { ok: okCount, total: pids.length }), 5000);
                 // Wait, then re-probe; if survivors, offer SIGKILL
                 await new Promise(r => setTimeout(r, 1500));
                 const after = await _runProbe();
@@ -2707,7 +2708,7 @@ function _rerenderCachedModels() {
                   }
                 }
                 if (survivors.length === 0) {
-                  uiModule.showToast(`Cleared ${pids.length} GPU process(es)`, 4000);
+                  uiModule.showToast(t('cookbookServe.clearedGpuProcesses', { count: pids.length }), 4000);
                   return;
                 }
                 if (!await window.styledConfirm(`${survivors.length} process(es) survived SIGTERM:\n\n${survivors.map(p => p.pid + ' (' + p.name + ')').join(', ')}\n\nForce-kill with SIGKILL?`, { confirmText: 'SIGKILL', danger: true })) return;
@@ -2719,12 +2720,12 @@ function _rerenderCachedModels() {
                   }).then(r => r.json()).catch(e => ({ ok: false, error: e.message }))
                 ));
                 const killOk = killResults.filter(r => r.ok).length;
-                uiModule.showToast(`SIGKILL → ${killOk}/${survivors.length} processes`, 5000);
+                uiModule.showToast(t('cookbookServe.sigkillResult', { ok: killOk, total: survivors.length }), 5000);
                 await new Promise(r => setTimeout(r, 800));
                 await _runProbe();
               });
             } catch (e) {
-              uiModule.showToast('Clear Server error: ' + e.message, 6000);
+              uiModule.showToast(t('cookbookServe.clearServerError', { reason: e.message }), 6000);
             }
           });
         }
@@ -2939,7 +2940,7 @@ function _rerenderCachedModels() {
         const launchTarget = _selectedServeTarget(panel);
         if (serveState.backend === 'diffusers' && _remoteWindowsDiffusersUnsupported(launchTarget)) {
           _restoreLaunchBtn();
-          uiModule.showToast('Diffusers serving is not supported on remote Windows servers yet. Use local Windows or a Linux server.', 9000);
+          uiModule.showToast(t('cookbookServe.diffusersWindowsUnsupported'), 9000);
           return;
         }
 

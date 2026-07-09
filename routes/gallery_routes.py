@@ -12,6 +12,7 @@ from fastapi import APIRouter, HTTPException, Query, Request
 
 from core.database import SessionLocal, GalleryImage, GalleryAlbum, ModelEndpoint
 from core.database import Session as DbSession
+from core.translations import t
 from src.auth_helpers import get_current_user, owner_filter, require_privilege
 from src.upload_limits import (
     read_upload_limited,
@@ -55,7 +56,7 @@ GALLERY_IMAGE_DIR = Path(GENERATED_IMAGES_DIR)
 def _gallery_image_path(filename: str) -> Path:
     """Resolve a stored gallery filename without leaving generated_images."""
     if not isinstance(filename, str):
-        raise HTTPException(400, "Unsafe gallery filename")
+        raise HTTPException(400, t("gallery.unsafe_filename"))
     safe_name = _sanitize_gallery_filename(filename)
     original = str(filename or "")
     root = GALLERY_IMAGE_DIR.resolve()
@@ -64,9 +65,9 @@ def _gallery_image_path(filename: str) -> Path:
         if os.path.commonpath([str(root), str(path)]) != str(root):
             raise ValueError
     except Exception:
-        raise HTTPException(400, "Unsafe gallery filename")
+        raise HTTPException(400, t("gallery.unsafe_filename"))
     if safe_name != original:
-        raise HTTPException(400, "Unsafe gallery filename")
+        raise HTTPException(400, t("gallery.unsafe_filename"))
     return path
 
 
@@ -127,7 +128,7 @@ async def _fetch_result_image_b64(url: str) -> Optional[str]:
         block_private=os.getenv("IMAGE_BLOCK_PRIVATE_IPS", "false").lower() == "true",
     )
     if not ok:
-        raise HTTPException(502, f"Upstream returned an unsafe image URL: {reason}")
+        raise HTTPException(502, t("ai_interaction.unsafe_image_url").format(reason=reason))
     async with httpx.AsyncClient(timeout=60) as c2:
         ir = await c2.get(url)
         if ir.status_code == 200:
@@ -148,7 +149,7 @@ def setup_gallery_routes() -> APIRouter:
         form = await request.form()
         file = form.get("file")
         if not file or not hasattr(file, 'filename'):
-            raise HTTPException(400, "No file provided")
+            raise HTTPException(400, t("gallery.no_file"))
 
         user = get_current_user(request)
         album_id = form.get("album_id") or None
@@ -173,7 +174,7 @@ def setup_gallery_routes() -> APIRouter:
             existing = _dup_q.first()
             if existing:
                 return {"ok": False, "duplicate": True, "filename": existing.filename,
-                        "id": existing.id, "message": "Duplicate photo skipped"}
+                        "id": existing.id, "message": t("gallery.duplicate_skipped")}
 
             img_dir = Path(GENERATED_IMAGES_DIR)
             img_dir.mkdir(parents=True, exist_ok=True)
@@ -182,7 +183,7 @@ def setup_gallery_routes() -> APIRouter:
             VIDEO_EXTS = {"mp4", "mov", "webm", "mkv", "m4v"}
             IMAGE_EXTS = {"png", "jpg", "jpeg", "webp", "gif"}
             if ext not in VIDEO_EXTS and ext not in IMAGE_EXTS:
-                raise HTTPException(400, f"Unsupported file type: .{ext}")
+                raise HTTPException(400, t("upload.unsupported_type") + f": .{ext}")
             is_video = ext in VIDEO_EXTS
             filename = f"{uuid.uuid4().hex[:12]}.{ext}"
             img_path = img_dir / filename
@@ -229,14 +230,14 @@ def setup_gallery_routes() -> APIRouter:
         try:
             img = db.query(GalleryImage).filter(GalleryImage.id == image_id).first()
             if not img:
-                raise HTTPException(404, "Image not found")
+                raise HTTPException(404, t("generated_images.not_found"))
             if not user or img.owner != user:
-                raise HTTPException(403, "Not your image")
+                raise HTTPException(403, t("gallery.not_your_image"))
 
             form = await request.form()
             file = form.get("image")
             if not file or not hasattr(file, 'read'):
-                raise HTTPException(400, "No image provided")
+                raise HTTPException(400, t("gallery.no_image"))
 
             content = await read_upload_limited(file, GALLERY_UPLOAD_MAX_BYTES, "Gallery replacement")
             GALLERY_IMAGE_DIR.mkdir(parents=True, exist_ok=True)
@@ -257,7 +258,7 @@ def setup_gallery_routes() -> APIRouter:
                 db.commit()
             except Exception as e:
                 db.rollback()
-                raise HTTPException(500, f"DB commit failed: {e}")
+                raise HTTPException(500, t("gallery.db_commit_failed").format(error=e))
             return {"ok": True, "width": img.width, "height": img.height}
         finally:
             db.close()
@@ -272,16 +273,16 @@ def setup_gallery_routes() -> APIRouter:
         data = await request.json()
         new_name = (data.get("name") or "").strip()
         if not new_name:
-            raise HTTPException(400, "Name cannot be empty")
+            raise HTTPException(400, t("gallery.name_empty"))
         if len(new_name) > 500:
-            raise HTTPException(400, "Name too long")
+            raise HTTPException(400, t("gallery.name_too_long"))
         db = SessionLocal()
         try:
             img = db.query(GalleryImage).filter(GalleryImage.id == image_id).first()
             if not img:
-                raise HTTPException(404, "Image not found")
+                raise HTTPException(404, t("generated_images.not_found"))
             if not user or img.owner != user:
-                raise HTTPException(403, "Not your image")
+                raise HTTPException(403, t("gallery.not_your_image"))
             img.prompt = new_name
             db.commit()
             return {"ok": True, "name": new_name}
@@ -301,22 +302,22 @@ def setup_gallery_routes() -> APIRouter:
         try:
             angle = int(data.get("angle", 90))
         except (TypeError, ValueError):
-            raise HTTPException(400, "Invalid angle")
+            raise HTTPException(400, t("gallery.invalid_angle"))
         if angle not in (90, -90, 180, 270):
-            raise HTTPException(400, "Angle must be 90, -90, 180, or 270")
+            raise HTTPException(400, t("gallery.angle_requirements"))
 
         user = get_current_user(request)
         db = SessionLocal()
         try:
             img = db.query(GalleryImage).filter(GalleryImage.id == image_id).first()
             if not img:
-                raise HTTPException(404, "Image not found")
+                raise HTTPException(404, t("generated_images.not_found"))
             if not user or img.owner != user:
-                raise HTTPException(403, "Not your image")
+                raise HTTPException(403, t("gallery.not_your_image"))
 
             img_path = _gallery_image_path(img.filename)
             if not img_path.exists():
-                raise HTTPException(404, "Image file not found")
+                raise HTTPException(404, t("gallery.image_file_not_found"))
 
             # PIL rotates counter-clockwise; the API takes "clockwise"
             # convention so we negate to match user expectation.
@@ -354,7 +355,7 @@ def setup_gallery_routes() -> APIRouter:
         user = require_privilege(request, "can_generate_images")
         form = await request.form()
         file = form.get("image")
-        if not file: raise HTTPException(400, "No image")
+        if not file: raise HTTPException(400, t("gallery.no_image"))
         scale = int(form.get("scale", "2"))
 
         image_bytes = await read_upload_limited(file, GALLERY_TRANSFORM_UPLOAD_MAX_BYTES, "Image upload")
@@ -368,7 +369,7 @@ def setup_gallery_routes() -> APIRouter:
             db.close()
 
         if not ep:
-            raise HTTPException(400, "No image generation endpoint configured. Add one in Settings → Add Models.")
+            raise HTTPException(400, t("gallery.no_endpoint"))
 
         base_url = ep.base_url.rstrip("/")
         if not base_url.endswith("/v1"):
@@ -384,7 +385,7 @@ def setup_gallery_routes() -> APIRouter:
                     data = resp.json()
                     return {"image": data.get("data", [{}])[0].get("b64_json", "")}
                 # Fallback: no upscale endpoint — return error
-                return {"error": f"Upscale endpoint not available ({resp.status_code})"}
+                return {"error": t("gallery.upscale_not_available").format(code=resp.status_code)}
         except Exception as e:
             return {"error": str(e)}
 
@@ -399,7 +400,7 @@ def setup_gallery_routes() -> APIRouter:
         file = form.get("image")
         prompt = form.get("prompt", "")
         strength = float(form.get("strength", "0.55"))
-        if not file: raise HTTPException(400, "No image")
+        if not file: raise HTTPException(400, t("gallery.no_image"))
 
         image_bytes = await read_upload_limited(file, GALLERY_TRANSFORM_UPLOAD_MAX_BYTES, "Image upload")
         b64 = base64.b64encode(image_bytes).decode()
@@ -411,7 +412,7 @@ def setup_gallery_routes() -> APIRouter:
             db.close()
 
         if not ep:
-            raise HTTPException(400, "No image generation endpoint configured.")
+            raise HTTPException(400, t("gallery.no_endpoint"))
 
         base_url = ep.base_url.rstrip("/")
         if not base_url.endswith("/v1"):
@@ -430,7 +431,7 @@ def setup_gallery_routes() -> APIRouter:
                     img_data = data.get("data", [{}])[0].get("b64_json", "")
                     if img_data:
                         return {"image": img_data}
-                return {"error": f"Style transfer failed ({resp.status_code})"}
+                return {"error": t("gallery.style_transfer_failed").format(code=resp.status_code)}
         except Exception as e:
             return {"error": str(e)}
 
@@ -590,7 +591,7 @@ def setup_gallery_routes() -> APIRouter:
             }
         except Exception as e:
             logger.error(f"Failed to fetch gallery library: {e}")
-            raise HTTPException(500, f"Failed to fetch gallery library: {e}")
+            raise HTTPException(500, t("gallery.fetch_failed").format(error=e))
         finally:
             db.close()
 
@@ -641,7 +642,7 @@ def setup_gallery_routes() -> APIRouter:
         data = await request.json()
         name = (data.get("name") or "").strip()
         if not name:
-            raise HTTPException(400, "Album name required")
+            raise HTTPException(400, t("gallery.album_name_required"))
         db = SessionLocal()
         try:
             a = GalleryAlbum(
@@ -716,10 +717,10 @@ def setup_gallery_routes() -> APIRouter:
                 .first()
             )
             if not row:
-                raise HTTPException(404, "Image not found")
+                raise HTTPException(404, t("generated_images.not_found"))
             img, session_name = row
             if not user or img.owner != user:
-                raise HTTPException(404, "Image not found")
+                raise HTTPException(404, t("generated_images.not_found"))
             return _image_to_dict(img, session_name)
         finally:
             db.close()
@@ -732,9 +733,9 @@ def setup_gallery_routes() -> APIRouter:
         try:
             img = db.query(GalleryImage).filter(GalleryImage.id == image_id).first()
             if not img:
-                raise HTTPException(404, "Image not found")
+                raise HTTPException(404, t("generated_images.not_found"))
             if not user or img.owner != user:
-                raise HTTPException(404, "Image not found")
+                raise HTTPException(404, t("generated_images.not_found"))
             if req.tags is not None:
                 # Drop any tag from the user-tags field that already lives in
                 # ai_tags — earlier flows wrote AI suggestions to both fields
@@ -780,14 +781,14 @@ def setup_gallery_routes() -> APIRouter:
     async def gallery_download_zip(request: Request):
         user = get_current_user(request)
         if not user:
-            raise HTTPException(401, "Not authenticated")
+            raise HTTPException(401, t("auth.not_authenticated"))
         try:
             data = await request.json()
         except Exception:
             data = {}
         ids = data.get("ids") or []
         if not ids:
-            raise HTTPException(400, "No images specified")
+            raise HTTPException(400, t("gallery.no_images_specified"))
         db = SessionLocal()
         try:
             imgs = db.query(GalleryImage).filter(
@@ -795,7 +796,7 @@ def setup_gallery_routes() -> APIRouter:
                 GalleryImage.owner == user,
             ).all()
             if not imgs:
-                raise HTTPException(404, "No images found")
+                raise HTTPException(404, t("gallery.no_images_found"))
             import io
             import re
             import zipfile
@@ -817,7 +818,7 @@ def setup_gallery_routes() -> APIRouter:
                     used.add(name)
                     zf.write(src, arcname=name)
             if not used:
-                raise HTTPException(404, "No image files found on disk")
+                raise HTTPException(404, t("gallery.no_image_files"))
             from fastapi import Response
             return Response(
                 content=buf.getvalue(),
@@ -923,9 +924,9 @@ def setup_gallery_routes() -> APIRouter:
         try:
             img = db.query(GalleryImage).filter(GalleryImage.id == image_id).first()
             if not img:
-                raise HTTPException(404, "Image not found")
+                raise HTTPException(404, t("generated_images.not_found"))
             if not user or img.owner != user:
-                raise HTTPException(404, "Image not found")
+                raise HTTPException(404, t("generated_images.not_found"))
 
             img_filename = img.filename
             # Soft-delete the record first; the DB is the source of truth.
@@ -1055,7 +1056,7 @@ def setup_gallery_routes() -> APIRouter:
                 block_private=os.getenv("IMAGE_BLOCK_PRIVATE_IPS", "false").lower() == "true",
             )
             if not ok:
-                raise HTTPException(400, f"Rejected endpoint URL: {reason}")
+                raise HTTPException(400, t("embedding.rejected_url").format(reason=reason))
         chosen_model = (body.pop("_model", "") or "").strip()
         api_key = None
         if not base:
@@ -1063,7 +1064,7 @@ def setup_gallery_routes() -> APIRouter:
             try:
                 ep = _first_visible_image_endpoint(db, user)
                 if not ep:
-                    raise HTTPException(400, "No image generation endpoint configured. Serve a diffusion model via Cookbook first.")
+                    raise HTTPException(400, t("gallery.no_endpoint_diffusion"))
                 base = ep.base_url.rstrip("/")
                 api_key = ep.api_key
             finally:
@@ -1087,7 +1088,7 @@ def setup_gallery_routes() -> APIRouter:
                     base = (ep.base_url or base).rstrip("/")
                     api_key = ep.api_key
                 elif user and not _current_user_is_admin(request, user):
-                    raise HTTPException(403, "Choose a registered image endpoint")
+                    raise HTTPException(403, t("gallery.choose_endpoint"))
             finally:
                 db.close()
 
@@ -1103,12 +1104,12 @@ def setup_gallery_routes() -> APIRouter:
             #   OpenAI: transparent alpha = regenerate, opaque = keep
             # So we convert the incoming PNG mask into an alpha-channel PNG.
             if not api_key:
-                raise HTTPException(400, "OpenAI endpoint has no api_key stored — edit it in Endpoints settings.")
+                raise HTTPException(400, t("gallery.no_api_key"))
             import base64, io
             try:
                 from PIL import Image
             except ImportError:
-                raise HTTPException(500, "Pillow not installed on server")
+                raise HTTPException(500, t("gallery.pillow_missing"))
 
             try:
                 img_bytes = base64.b64decode(body["image"])
@@ -1132,7 +1133,7 @@ def setup_gallery_routes() -> APIRouter:
             except HTTPException:
                 raise
             except Exception as e:
-                raise HTTPException(400, f"Failed to prepare OpenAI request: {e}")
+                raise HTTPException(400, t("gallery.openai_prepare_failed").format(error=e))
 
             width = int(body.get("width") or 1024)
             height = int(body.get("height") or 1024)
@@ -1153,7 +1154,7 @@ def setup_gallery_routes() -> APIRouter:
             # dall-e-3 has no edit endpoint — refuse it loudly so the user picks again.
             oa_model = chosen_model or "gpt-image-1"
             if "dall-e-3" in oa_model:
-                raise HTTPException(400, "dall-e-3 doesn't support image edits — pick gpt-image-1 or dall-e-2")
+                raise HTTPException(400, t("gallery.dalle3_no_edits"))
             data = {
                 "model": oa_model,
                 "prompt": body.get("prompt", ""),
@@ -1165,7 +1166,7 @@ def setup_gallery_routes() -> APIRouter:
                 async with httpx.AsyncClient(timeout=120) as client:
                     r = await client.post(f"{base}/images/edits", headers=headers, data=data, files=files)
                     if r.status_code != 200:
-                        raise HTTPException(r.status_code, f"OpenAI edit failed: {r.text[:300]}")
+                        raise HTTPException(r.status_code, t("gallery.openai_edit_failed").format(detail=r.text[:300]))
                     result = r.json()
                     raw_b64 = None
                     if result.get("data"):
@@ -1176,7 +1177,7 @@ def setup_gallery_routes() -> APIRouter:
                         elif item.get("url"):
                             raw_b64 = await _fetch_result_image_b64(item["url"])
                     if not raw_b64:
-                        raise HTTPException(502, "OpenAI returned no image")
+                        raise HTTPException(502, t("gallery.no_image_returned"))
 
                     # OpenAI's edits API doesn't truly preserve unmasked
                     # pixels — gpt-image-1 regenerates the whole image,
@@ -1203,7 +1204,7 @@ def setup_gallery_routes() -> APIRouter:
                         logger.warning(f"Inpaint compose failed, returning raw: {comp_err}")
                         return {"image": raw_b64}
             except httpx.TimeoutException:
-                raise HTTPException(504, "OpenAI inpaint timed out (120s)")
+                raise HTTPException(504, t("gallery.openai_timed_out"))
 
         # Self-hosted diffusion server path
         try:
@@ -1214,14 +1215,14 @@ def setup_gallery_routes() -> APIRouter:
             async with httpx.AsyncClient(timeout=120) as client:
                 r = await client.post(f"{base}/images/inpaint", json=body)
                 if r.status_code != 200:
-                    raise HTTPException(r.status_code, f"Inpaint failed: {r.text[:200]}")
+                    raise HTTPException(r.status_code, t("gallery.inpaint_failed").format(detail=r.text[:200]))
                 return r.json()
         except httpx.TimeoutException:
-            raise HTTPException(504, "Inpaint request timed out (120s)")
+            raise HTTPException(504, t("gallery.inpaint_timed_out"))
         except HTTPException:
             raise
         except Exception as e:
-            raise HTTPException(502, f"Inpaint error: {str(e)}")
+            raise HTTPException(502, t("gallery.inpaint_error").format(error=str(e)))
 
     # ---- POST /api/image/harmonize — proper img2img call ----
     # Earlier version routed through inpaint with a full-white mask, but
@@ -1241,7 +1242,7 @@ def setup_gallery_routes() -> APIRouter:
 
         image_b64 = body.get("image")
         if not image_b64:
-            raise HTTPException(400, "No image provided")
+            raise HTTPException(400, t("gallery.no_image"))
 
         endpoint = (body.get("_endpoint") or "").rstrip("/")
         # SSRF hardening: a client-supplied endpoint is fetched server-side
@@ -1255,7 +1256,7 @@ def setup_gallery_routes() -> APIRouter:
                 block_private=os.getenv("IMAGE_BLOCK_PRIVATE_IPS", "false").lower() == "true",
             )
             if not ok:
-                raise HTTPException(400, f"Rejected endpoint URL: {reason}")
+                raise HTTPException(400, t("embedding.rejected_url").format(reason=reason))
         model = (body.get("_model") or "").strip()
 
         base = endpoint
@@ -1265,7 +1266,7 @@ def setup_gallery_routes() -> APIRouter:
             try:
                 ep = _first_visible_image_endpoint(db, user)
                 if not ep:
-                    raise HTTPException(400, "No image generation endpoint configured.")
+            raise HTTPException(400, t("gallery.no_endpoint"))
                 base = ep.base_url.rstrip("/")
                 api_key = ep.api_key
             finally:
@@ -1278,7 +1279,7 @@ def setup_gallery_routes() -> APIRouter:
                     base = (ep.base_url or base).rstrip("/")
                     api_key = ep.api_key
                 elif user and not _current_user_is_admin(request, user):
-                    raise HTTPException(403, "Choose a registered image endpoint")
+                    raise HTTPException(403, t("gallery.choose_endpoint"))
             finally:
                 db.close()
 
@@ -1315,10 +1316,7 @@ def setup_gallery_routes() -> APIRouter:
         # user to spin up a real diffusion endpoint instead.
         if "api.openai.com" in base:
             raise HTTPException(400,
-                "Harmonize needs a diffusion server that supports img2img "
-                "(SD WebUI / Forge / Comfy). OpenAI's API doesn't expose "
-                "one. Cookbook → Models can serve an SD-compatible model "
-                "locally in a few clicks.")
+                t("gallery.harmonize_needs_diffusion"))
 
         # Try img2img-shaped routes in order. Most self-hosted servers
         # expose at least one of these. Whatever returns 200 wins.
@@ -1395,7 +1393,7 @@ def setup_gallery_routes() -> APIRouter:
                         # (otherwise the real error gets buried under 404s).
                         if data.get("error") and not data.get("image"):
                             raise HTTPException(502,
-                                f"Diffusion server error at {path}: {data['error']}")
+                                t("gallery.diffusion_error").format(path=path, detail=data['error']))
                         if data.get("image"):
                             return {"image": data["image"]}
                         if data.get("images") and isinstance(data["images"], list):
@@ -1416,14 +1414,11 @@ def setup_gallery_routes() -> APIRouter:
                                     return {"image": img_b64}
                     last_err = f"{path}: server returned no image"
                 except httpx.ConnectError as e:
-                    raise HTTPException(502, f"Can't reach diffusion server at {base}: {e}")
+                    raise HTTPException(502, t("gallery.diffusion_unreachable").format(base=base, error=e))
                 except httpx.TimeoutException:
-                    raise HTTPException(504, "Harmonize timed out (240s) — restart the diffusion server or lower Color match / disable Seam fix")
+                    raise HTTPException(504, t("gallery.harmonize_timed_out"))
         raise HTTPException(502,
-            f"None of the img2img routes worked on {base}. "
-            f"Last response: {last_err or 'unknown'}. "
-            "Your diffusion server needs to expose one of /v1/images/harmonize, "
-            "/v1/images/img2img, /v1/images/variations, or /sdapi/v1/img2img.")
+            t("gallery.img2img_failed").format(base=base, last_err=last_err or 'unknown'))
 
     # ---- POST /api/image/sharpen ----
     @router.post("/api/image/sharpen")
@@ -1457,7 +1452,7 @@ def setup_gallery_routes() -> APIRouter:
         body = await request.json()
         image_b64 = body.get("image")
         if not image_b64:
-            raise HTTPException(400, "No image provided")
+            raise HTTPException(400, t("gallery.no_image"))
         try:
             strength = float(body.get("strength", 0.5))
         except Exception:
@@ -1468,7 +1463,7 @@ def setup_gallery_routes() -> APIRouter:
             from PIL import Image
             import numpy as np
         except ImportError as e:
-            raise HTTPException(500, f"Server missing dependency: {e}")
+            raise HTTPException(500, t("gallery.missing_dependency").format(error=e))
         # Decode source image (RGB; Real-ESRGAN doesn't preserve alpha).
         img_bytes = base64.b64decode(image_b64)
         src = Image.open(io.BytesIO(img_bytes)).convert("RGB")
@@ -1476,7 +1471,7 @@ def setup_gallery_routes() -> APIRouter:
             patch_realesrgan_torchvision_compat()
             from realesrgan import RealESRGANer
         except ImportError:
-            return {"error": "realesrgan not installed. Install it from Cookbook → Dependencies (search 'realesrgan')."}
+            return {"error": t("gallery.realesrgan_missing")}
         try:
             # General-purpose lightweight model with denoise control.
             from realesrgan.archs.srvgg_arch import SRVGGNetCompact
@@ -1497,7 +1492,7 @@ def setup_gallery_routes() -> APIRouter:
             return {"image": base64.b64encode(buf.getvalue()).decode()}
         except Exception as e:
             logger.warning(f"Denoise failed: {e}")
-            return {"error": f"Denoise failed: {e}"}
+            return {"error": t("gallery.denoise_failed").format(error=e)}
 
     # ---- POST /api/image/upscale-local ----
     # Local Real-ESRGAN upscale (2× or 4×). Self-contained — no diffusion
@@ -1508,7 +1503,7 @@ def setup_gallery_routes() -> APIRouter:
         body = await request.json()
         image_b64 = body.get("image")
         if not image_b64:
-            raise HTTPException(400, "No image provided")
+            raise HTTPException(400, t("gallery.no_image"))
         try:
             scale = int(body.get("scale", 2))
         except Exception:
@@ -1519,7 +1514,7 @@ def setup_gallery_routes() -> APIRouter:
             from PIL import Image
             import numpy as np
         except ImportError as e:
-            raise HTTPException(500, f"Server missing dependency: {e}")
+            raise HTTPException(500, t("gallery.missing_dependency").format(error=e))
         img_bytes = base64.b64decode(image_b64)
         src = Image.open(io.BytesIO(img_bytes)).convert("RGB")
         try:
@@ -1527,7 +1522,7 @@ def setup_gallery_routes() -> APIRouter:
             from basicsr.archs.rrdbnet_arch import RRDBNet
             from realesrgan import RealESRGANer
         except ImportError:
-            return {"error": "realesrgan not installed. Install it from Cookbook → Dependencies (search 'realesrgan')."}
+            return {"error": t("gallery.realesrgan_missing")}
         try:
             model = RRDBNet(num_in_ch=3, num_out_ch=3, num_feat=64,
                             num_block=23, num_grow_ch=32, scale=4)
@@ -1545,7 +1540,7 @@ def setup_gallery_routes() -> APIRouter:
             return {"image": base64.b64encode(buf.getvalue()).decode()}
         except Exception as e:
             logger.warning(f"Upscale failed: {e}")
-            return {"error": f"Upscale failed: {e}"}
+            return {"error": t("gallery.upscale_failed").format(error=e)}
 
     # ---- POST /api/image/remove-bg ----
     @router.post("/api/image/remove-bg")
@@ -1614,7 +1609,7 @@ def setup_gallery_routes() -> APIRouter:
                 tmp.putalpha(mask_img)
                 cut = tmp
             except Exception:
-                return {"error": "No background removal model available. Install rembg: pip install rembg"}
+                return {"error": t("gallery.rembg_missing")}
 
         # Compose the cropped result back into a full-size transparent canvas.
         if bbox:
@@ -1648,7 +1643,7 @@ def setup_gallery_routes() -> APIRouter:
         body = await request.json()
         image_b64 = body.get("image")
         if not image_b64:
-            raise HTTPException(400, "No image provided")
+            raise HTTPException(400, t("gallery.no_image"))
 
         import base64, io, tempfile, os
         from PIL import Image, ImageFilter, ImageEnhance
@@ -1704,24 +1699,24 @@ def setup_gallery_routes() -> APIRouter:
             enhanced.save(buf, format="PNG")
             return {"image": base64.b64encode(buf.getvalue()).decode(), "method": "pil"}
         except Exception as e:
-            raise HTTPException(500, f"Face enhancement failed: {str(e)}")
+            raise HTTPException(500, t("gallery.face_enhancement_failed").format(error=str(e)))
 
     # ---- Album management (path-param routes) ----
 
     def _get_or_404_album(db, album_id: str, user):
         album = db.query(GalleryAlbum).filter(GalleryAlbum.id == album_id).first()
         if not album:
-            raise HTTPException(404, "Album not found")
+            raise HTTPException(404, t("gallery.album_not_found"))
         if not user or album.owner != user:
-            raise HTTPException(404, "Album not found")
+            raise HTTPException(404, t("gallery.album_not_found"))
         return album
 
     def _get_or_404_image(db, image_id: str, user):
         img = db.query(GalleryImage).filter(GalleryImage.id == image_id).first()
         if not img:
-            raise HTTPException(404, "Image not found")
+            raise HTTPException(404, t("generated_images.not_found"))
         if not user or img.owner != user:
-            raise HTTPException(404, "Image not found")
+            raise HTTPException(404, t("generated_images.not_found"))
         return img
 
     @router.put("/api/gallery/albums/{album_id}")
@@ -1827,7 +1822,7 @@ def setup_gallery_routes() -> APIRouter:
 
             img_path = _gallery_image_path(img.filename)
             if not img_path.exists():
-                raise HTTPException(404, "Image file not found")
+                raise HTTPException(404, t("gallery.image_file_not_found"))
 
             # Read and encode
             img_bytes = img_path.read_bytes()
@@ -1840,14 +1835,14 @@ def setup_gallery_routes() -> APIRouter:
             from src.document_processor import _load_vl_settings, _resolve_vl_model
             vl_settings = _load_vl_settings()
             if not vl_settings.get("vision_enabled", True):
-                return {"error": "Vision is disabled — enable it in Settings → Vision"}
+                return {"error": t("gallery.vision_disabled")}
             configured = vl_settings.get("vision_model", "")
             try:
                 chat_url, model_name, headers = _resolve_vl_model(configured, owner=user)
             except ValueError:
-                return {"error": "No vision model configured — set one in Settings → Vision"}
+                return {"error": t("gallery.no_vision_model")}
             if not chat_url:
-                return {"error": "No vision-capable endpoint configured"}
+                return {"error": t("gallery.no_vision_endpoint")}
 
             # Call vision model — format differs between Anthropic and OpenAI
             from src.llm_core import _detect_provider, _restricts_temperature, _uses_max_completion_tokens
@@ -1901,7 +1896,7 @@ def setup_gallery_routes() -> APIRouter:
                 if resp.status_code != 200:
                     body = resp.text[:500]
                     logger.error(f"Vision model {resp.status_code}: {body}")
-                    return {"error": f"Vision model returned {resp.status_code}: {body[:200]}"}
+                    return {"error": t("gallery.vision_model_error").format(code=resp.status_code, detail=body[:200])}
                 data = resp.json()
                 # Anthropic returns content[0].text, OpenAI returns choices[0].message.content
                 if provider == "anthropic":

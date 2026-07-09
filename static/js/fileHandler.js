@@ -6,6 +6,7 @@
 
 import uiModule from './ui.js';
 import spinnerModule from './spinner.js';
+import { t } from './i18n.js';
 
 let pendingFiles = [];
 let uploaded = [];
@@ -178,7 +179,7 @@ export async function uploadPending() {
       // pendingFiles so the strip re-renders for a retry (see finally below).
       let detail = '';
       try { const e = await res.json(); detail = e.detail || e.error || ''; } catch (_) {}
-      _showToast('Upload failed' + (detail ? ': ' + detail : ` (HTTP ${res.status})`));
+      _showToast(t('fileHandler.uploadFailed', { detail, status: res.status }));
       return [];
     }
     const data = await res.json();
@@ -205,7 +206,7 @@ export async function uploadPending() {
 export function addFiles(files) {
   for (const f of files) {
     if (pendingFiles.length >= MAX_FILES) {
-      _showToast(`Max ${MAX_FILES} files allowed`);
+      _showToast(t('fileHandler.maxFiles', { max: MAX_FILES }));
       break;
     }
     pendingFiles.push(f);

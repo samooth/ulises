@@ -8,6 +8,7 @@ import { clearDockSide } from './modalSnap.js';
 import { sortModelIds } from './modelSort.js';
 import { providerLogo } from './providers.js';
 import { isAltGrEvent } from './platform.js';
+import { t, setLanguage, getCurrentLang } from './i18n.js';
 
 let initialized = false;
 let modalEl = null;
@@ -2358,6 +2359,7 @@ function initAll() {
   initEmailAccountsSettings();
   initReminderSettings();
   initUnifiedIntegrations();
+  initLanguageSettings();
 }
 
 function notifyIntegrationsChanged() {
@@ -2827,6 +2829,33 @@ async function initReminderSettings() {
       }
     });
   }
+}
+
+function initLanguageSettings() {
+  const sel = document.getElementById('set-app-language');
+  if (!sel || sel.dataset.bound === '1') return;
+  sel.dataset.bound = '1';
+
+  fetch('/api/prefs/app_language', { credentials: 'same-origin' })
+    .then(r => r.json())
+    .then(data => {
+      if (data.value) {
+        sel.value = data.value;
+        setLanguage(data.value).catch(() => {});
+      }
+    })
+    .catch(() => {});
+
+  sel.addEventListener('change', () => {
+    const lang = sel.value;
+    setLanguage(lang).catch(() => {});
+    fetch('/api/prefs/app_language', {
+      method: 'PUT',
+      credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ value: lang }),
+    }).catch(() => {});
+  });
 }
 
 async function initEmailAccountsSettings() {

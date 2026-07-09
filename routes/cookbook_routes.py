@@ -14,6 +14,7 @@ from pathlib import Path
 
 from fastapi import APIRouter, HTTPException, Request, Depends
 
+from core.translations import t
 from src.auth_helpers import require_user
 from src.constants import COOKBOOK_STATE_FILE
 from pydantic import BaseModel
@@ -220,12 +221,12 @@ def setup_cookbook_routes() -> APIRouter:
             ),
             (
                 r"No module named 'torch'|No module named torch|No module named 'diffusers'|No module named diffusers",
-                "Diffusion serving requires PyTorch and diffusers.",
+                t("cookbook.diffusers_no_torch"),
                 [{"label": "install diffusers[torch] in Cookbook Dependencies", "op": "dependency", "package": "diffusers[torch]"}],
             ),
             (
                 r"403 Forbidden|401 Unauthorized|Access to model.*is restricted|gated repo|not in the authorized list|awaiting a review",
-                "Model access is gated or unauthorized.",
+                t("cookbook.model_gated"),
                 [{"label": "set HF token and request model access on HuggingFace", "op": "manual"}],
             ),
         ]
@@ -236,7 +237,7 @@ def setup_cookbook_routes() -> APIRouter:
             r"Application startup complete|GET /v1/|Uvicorn running on", tail, re.I
         ):
             return {
-                "message": "Python traceback detected during serve startup.",
+                "message": t("cookbook.traceback_detected"),
                 "suggestions": [{"label": "inspect traceback and retry with adjusted backend/settings", "op": "manual"}],
             }
         return None
@@ -395,7 +396,7 @@ def setup_cookbook_routes() -> APIRouter:
             stdout, stderr = await proc.communicate()
             if proc.returncode != 0:
                 detail = (stderr or stdout).decode("utf-8", errors="replace").strip()[-500:]
-                return {"ok": False, "error": detail or "Failed to generate SSH key"}
+                return {"ok": False, "error": detail or t("cookbook.ssh_key_failed")}
         safe_chmod(key_path, 0o600)
         safe_chmod(key_path.with_suffix(".pub"), 0o644)
         return {"ok": True, "public_key": _read_cookbook_public_key()}
@@ -405,16 +406,10 @@ def setup_cookbook_routes() -> APIRouter:
 
     def _missing_binary_message(binary: str, target: str) -> str:
         if binary == "tmux":
-            return (
-                f"tmux is required for Cookbook background downloads/serves on {target}. "
-                "Install it with your OS package manager, or run Cookbook server setup for that server."
-            )
+            return t("cookbook.missing_tmux").format(target=target)
         if binary == "docker":
-            return (
-                f"Docker is required by this Cookbook launch command on {target}, but the docker CLI was not found. "
-                "Install Docker and make sure this user can run `docker`, then retry."
-            )
-        return f"{binary} is required on {target}, but it was not found."
+            return t("cookbook.missing_docker").format(target=target)
+        return t("cookbook.missing_binary").format(binary=binary, target=target)
 
     async def _remote_binary_available(remote: str, ssh_port: str | None, binary: str, *, windows: bool = False) -> bool:
         _port = ssh_port or ""
@@ -1357,7 +1352,7 @@ def setup_cookbook_routes() -> APIRouter:
             if not req.repo_id or not re.fullmatch(
                 r"[A-Za-z0-9][A-Za-z0-9._\-\[\]<>=!,~]{0,200}", req.repo_id
             ):
-                raise HTTPException(400, "Invalid pip package name")
+                raise HTTPException(400, t("cookbook.repo_format"))
         else:
             _validate_serve_model_id(req.repo_id)
         TMUX_LOG_DIR.mkdir(parents=True, exist_ok=True)
@@ -1388,7 +1383,7 @@ def setup_cookbook_routes() -> APIRouter:
         if is_windows and remote and "diffusion_server.py" in req.cmd:
             raise HTTPException(
                 400,
-                "Remote Windows Diffusers serving is not supported yet; use local Windows or a Linux remote server.",
+                t("cookbook.diffusers_no_torch"),
             )
 
         if not is_windows and not local_windows and not await _binary_available("tmux", remote, req.ssh_port):
@@ -1923,7 +1918,7 @@ def setup_cookbook_routes() -> APIRouter:
         require_admin(request)
         host = validate_remote_host(req.host)
         if not host:
-            raise HTTPException(400, "host is required")
+            raise HTTPException(400, t("cookbook.repo_format"))
         port = req.ssh_port
         port = validate_ssh_port(port)
         pf = f"-p {port} " if port and port != "22" else ""
@@ -2002,7 +1997,7 @@ def setup_cookbook_routes() -> APIRouter:
             ok = "OK" in output
             return {"ok": ok, "output": output.strip(), "platform": platform}
         except asyncio.TimeoutError:
-            return {"ok": False, "error": "Setup timed out (120s)", "platform": platform}
+            return {"ok": False, "error": t("cookbook.setup_timed_out"), "platform": platform}
         except Exception as e:
             return {"ok": False, "error": str(e), "platform": platform}
 
@@ -2025,10 +2020,10 @@ def setup_cookbook_routes() -> APIRouter:
             stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=timeout)
         except asyncio.TimeoutError:
             proc.kill()
-            return None, "nvidia-smi timed out"
+            return None, t("cookbook.gpu_probe_timed_out")
         if proc.returncode != 0:
             err = (stderr.decode("utf-8", errors="replace") or "").strip()[:200]
-            return None, err or "nvidia-smi failed"
+            return None, err or t("cookbook.gpu_probe_failed")
         return stdout.decode("utf-8", errors="replace"), None
 
     async def _run_gpu_shell(cmd_text: str, host: str | None, ssh_port: str | None, timeout: int = 8):
@@ -2040,7 +2035,7 @@ def setup_cookbook_routes() -> APIRouter:
                 f"if command -v sh >/dev/null 2>&1; then sh -lc {quoted_cmd}; "
                 f"elif command -v bash >/dev/null 2>&1; then bash -lc {quoted_cmd}; "
                 f"elif command -v zsh >/dev/null 2>&1; then zsh -lc {quoted_cmd}; "
-                "else echo 'No POSIX shell found for GPU probe' >&2; exit 127; fi"
+                "else echo '" + t("cookbook.no_posix_shell") + "' >&2; exit 127; fi"
             )
             cmd = f"ssh -o ConnectTimeout=5 -o StrictHostKeyChecking=no {pf}{host} {shlex.quote(remote_cmd)}"
             proc = await asyncio.create_subprocess_shell(
@@ -2054,10 +2049,10 @@ def setup_cookbook_routes() -> APIRouter:
             stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=timeout)
         except asyncio.TimeoutError:
             proc.kill()
-            return None, "GPU probe timed out"
+            return None, t("cookbook.gpu_probe_timed_out")
         if proc.returncode != 0:
             err = (stderr.decode("utf-8", errors="replace") or "").strip()[:200]
-            return None, err or f"GPU probe failed ({proc.returncode})"
+            return None, err or t("cookbook.gpu_probe_failed").format(code=proc.returncode)
         return stdout.decode("utf-8", errors="replace"), None
 
     async def _gpu_read_file(path: str, host: str | None, ssh_port: str | None) -> str | None:
@@ -2198,7 +2193,7 @@ def setup_cookbook_routes() -> APIRouter:
                 nvidia_error = err
                 gpu_out = ""
         except FileNotFoundError:
-            nvidia_error = "nvidia-smi not found"
+            nvidia_error = t("cookbook.gpu_probe_not_found")
             gpu_out = ""
         except Exception as e:
             nvidia_error = str(e)[:200]
@@ -2329,7 +2324,7 @@ def setup_cookbook_routes() -> APIRouter:
                 "nvidia_error": nvidia_error,
             }
 
-        return {"ok": False, "error": nvidia_error or "No GPU memory probe available", "gpus": []}
+        return {"ok": False, "error": nvidia_error or t("cookbook.no_gpu_probe"), "gpus": []}
 
     class KillPidRequest(BaseModel):
         pid: int
@@ -2347,10 +2342,10 @@ def setup_cookbook_routes() -> APIRouter:
         """
         require_admin(request)
         if req.pid < 100:
-            raise HTTPException(400, f"Refusing to signal PID {req.pid} (<100, likely system process)")
+            raise HTTPException(400, t("cookbook.pid_not_running").format(pid=req.pid))
         sig = (req.signal or "TERM").upper()
         if sig not in ("TERM", "KILL", "INT"):
-            raise HTTPException(400, "signal must be TERM, KILL, or INT")
+            raise HTTPException(400, t("cookbook.repo_format"))
         host = validate_remote_host(req.host)
         req.ssh_port = validate_ssh_port(req.ssh_port)
         kill_cmd = f"kill -{sig} {req.pid}"
@@ -2368,7 +2363,7 @@ def setup_cookbook_routes() -> APIRouter:
                 # NB: never use os.kill(pid, 0) to probe here — on Windows that
                 # routes to TerminateProcess and would kill the process.
                 if not pid_alive(req.pid):
-                    return {"ok": False, "error": f"PID {req.pid} is not running"}
+                    return {"ok": False, "error": t("cookbook.pid_not_running").format(pid=req.pid)}
                 await asyncio.to_thread(kill_process_tree, req.pid)
                 return {"ok": True, "pid": req.pid, "signal": sig}
             else:
@@ -2382,7 +2377,7 @@ def setup_cookbook_routes() -> APIRouter:
                 return {"ok": False, "error": err or f"kill returned {proc.returncode}"}
             return {"ok": True, "pid": req.pid, "signal": sig}
         except asyncio.TimeoutError:
-            return {"ok": False, "error": "kill command timed out"}
+            return {"ok": False, "error": t("cookbook.kill_timed_out")}
         except Exception as e:
             return {"ok": False, "error": str(e)[:200]}
 
@@ -2531,7 +2526,7 @@ def setup_cookbook_routes() -> APIRouter:
             async with httpx.AsyncClient(timeout=15) as client:
                 resp = await client.get(url)
                 if resp.status_code != 200:
-                    return {"models": [], "error": f"HF API HTTP {resp.status_code}"}
+                    return {"models": [], "error": t("cookbook.hf_api_error").format(code=resp.status_code)}
                 raw = resp.json()
         except Exception as e:
             return {"models": [], "error": str(e)}
@@ -2822,11 +2817,11 @@ def setup_cookbook_routes() -> APIRouter:
             async with httpx.AsyncClient(timeout=15, follow_redirects=True) as client:
                 resp = await client.get(url, headers=headers)
                 if resp.status_code != 200:
-                    return {"ok": False, "files": [], "error": f"HF API HTTP {resp.status_code}"}
+                    return {"ok": False, "files": [], "error": t("cookbook.hf_api_error").format(code=resp.status_code)}
                 data = resp.json()
         except Exception:
             logger.exception("HF GGUF file scan failed for %s", repo)
-            return {"ok": False, "files": [], "error": "HF API request failed"}
+            return {"ok": False, "files": [], "error": t("cookbook.hf_api_failed")}
         files = [
             str(s.get("rfilename") or "")
             for s in data.get("siblings", [])
@@ -3033,7 +3028,7 @@ def setup_cookbook_routes() -> APIRouter:
         now = _time.time()
         repo = (repo or "").strip().strip("/")
         if "/" not in repo:
-            return {"exists": False, "error": "repo must be <org>/<model>"}
+            return {"exists": False, "error": t("cookbook.repo_format")}
 
         cached = _vllm_recipe_cache.get(repo)
         if cached and not refresh and (now - cached[0]) < TTL:
@@ -3057,12 +3052,12 @@ def setup_cookbook_routes() -> APIRouter:
             _vllm_recipe_cache[repo] = (now, {"exists": False})
             return {"exists": False}
         if status != 200:
-            return {"exists": False, "error": f"HTTP {status}", "transient": True}
+            return {"exists": False, "error": t("cookbook.http_status").format(code=status), "transient": True}
 
         try:
             doc = _yaml.safe_load(text) or {}
         except Exception as e:
-            return {"exists": False, "error": f"yaml parse: {e}"}
+            return {"exists": False, "error": t("cookbook.yaml_parse_failed").format(error=e)}
 
         meta = doc.get("meta") or {}
         model = doc.get("model") or {}
@@ -3463,7 +3458,7 @@ def setup_cookbook_routes() -> APIRouter:
             if diagnosis and status in {"running", "unknown", "stopped"} and phase_info.get("status") != "ready":
                 status = "error"
             if download_zero_files:
-                diagnosis = {"message": "No matching files were downloaded. The model repo or filename/quant pattern may be wrong (for example a ':Q4_K_M' tag that does not exist in the repo). Check the repo and the include/quant pattern."}
+                diagnosis = {"message": t("cookbook.no_files_matched")}
             output_tail = error_aware_output_tail(full_snapshot, status)
 
             results.append({

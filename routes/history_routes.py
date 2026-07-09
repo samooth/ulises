@@ -10,6 +10,7 @@ from fastapi import APIRouter, Request, HTTPException
 from core.models import ChatMessage
 from core.database import SessionLocal, ChatMessage as DbChatMessage, Session as DbSession
 from src.topic_analyzer import analyze_topics
+from core.translations import t
 from routes.session_routes import (
     _message_role,
     _message_text,
@@ -49,7 +50,7 @@ def setup_history_routes(session_manager) -> APIRouter:
         try:
             session = session_manager.get_session(session_id)
         except KeyError:
-            raise HTTPException(404, f"Session '{session_id}' not found")
+            raise HTTPException(404, t("session.not_found").format(id=session_id))
 
         history_dict = []
         for msg in session.history:
@@ -130,7 +131,7 @@ def setup_history_routes(session_manager) -> APIRouter:
             result = session_manager.truncate_messages(session_id, keep_count)
             return {"status": "ok", "kept": keep_count, "truncated": result}
         except KeyError:
-            raise HTTPException(404, "Session not found")
+            raise HTTPException(404, t("session.not_found_generic"))
         except Exception as e:
             logger.error(f"Truncate error {session_id}: {e}")
             raise HTTPException(500, str(e))
@@ -144,12 +145,12 @@ def setup_history_routes(session_manager) -> APIRouter:
             role = body.get("role", "assistant")
             content = body.get("content", "")
             if not content:
-                raise HTTPException(400, "content is required")
+                raise HTTPException(400, t("session.content_required"))
             msg = ChatMessage(role=role, content=content, metadata=body.get("metadata"))
             session_manager.add_message(session_id, msg)
             return {"status": "ok"}
         except KeyError:
-            raise HTTPException(404, "Session not found")
+            raise HTTPException(404, t("session.not_found_generic"))
 
     @router.post("/api/session/{session_id}/delete-messages")
     async def delete_messages(request: Request, session_id: str):
@@ -209,7 +210,7 @@ def setup_history_routes(session_manager) -> APIRouter:
             finally:
                 db.close()
         except KeyError:
-            raise HTTPException(404, "Session not found")
+            raise HTTPException(404, t("session.not_found_generic"))
         except Exception as e:
             logger.error(f"Delete messages error {session_id}: {e}")
             raise HTTPException(500, str(e))
@@ -223,7 +224,7 @@ def setup_history_routes(session_manager) -> APIRouter:
             msg_id = body.get("msg_id")
             content = body.get("content")
             if not msg_id or content is None:
-                raise HTTPException(400, "msg_id and content are required")
+                raise HTTPException(400, t("session.msg_id_and_content_required"))
 
             session = session_manager.get_session(session_id)
             db = SessionLocal()
@@ -233,7 +234,7 @@ def setup_history_routes(session_manager) -> APIRouter:
                     DbChatMessage.session_id == session_id,
                 ).first()
                 if not db_msg:
-                    raise HTTPException(404, "Message not found")
+                    raise HTTPException(404, t("session.message_not_found"))
 
                 db_msg.content = content
                 meta = {}
@@ -260,7 +261,7 @@ def setup_history_routes(session_manager) -> APIRouter:
             finally:
                 db.close()
         except KeyError:
-            raise HTTPException(404, "Session not found")
+            raise HTTPException(404, t("session.not_found_generic"))
         except HTTPException:
             raise
         except Exception as e:
@@ -317,7 +318,7 @@ def setup_history_routes(session_manager) -> APIRouter:
             session_manager.save_sessions()
             return {"status": "ok"}
         except KeyError:
-            raise HTTPException(404, "Session not found")
+            raise HTTPException(404, t("session.not_found_generic"))
         except Exception as e:
             logger.error(f"Mark stopped error {session_id}: {e}")
             raise HTTPException(500, str(e))
@@ -368,7 +369,7 @@ def setup_history_routes(session_manager) -> APIRouter:
             session_manager.save_sessions()
             return {"status": "ok"}
         except KeyError:
-            raise HTTPException(404, "Session not found")
+            raise HTTPException(404, t("session.not_found_generic"))
         except Exception as e:
             logger.error(f"Update last meta error {session_id}: {e}")
             raise HTTPException(500, str(e))
@@ -457,7 +458,7 @@ def setup_history_routes(session_manager) -> APIRouter:
             session_manager.save_sessions()
             return {"status": "ok", "merged": True}
         except KeyError:
-            raise HTTPException(404, "Session not found")
+            raise HTTPException(404, t("session.not_found_generic"))
         except Exception as e:
             logger.error(f"Merge assistant error {session_id}: {e}")
             raise HTTPException(500, str(e))
@@ -473,7 +474,7 @@ def setup_history_routes(session_manager) -> APIRouter:
             # Get the source session
             source = session_manager.sessions.get(session_id)
             if not source:
-                raise HTTPException(404, "Session not found")
+                raise HTTPException(404, t("session.not_found_generic"))
 
             # Create new session
             new_id = str(uuid.uuid4())
@@ -522,7 +523,7 @@ def setup_history_routes(session_manager) -> APIRouter:
         try:
             return analyze_topics(session_manager, owner=user or None)
         except Exception as e:
-            raise HTTPException(500, f"Topic analysis failed: {e}")
+            raise HTTPException(500, t("session.topic_analysis_failed").format(error=str(e)))
 
     @router.post("/api/session/{session_id}/compact")
     async def compact_session(request: Request, session_id: str):
@@ -533,7 +534,7 @@ def setup_history_routes(session_manager) -> APIRouter:
         try:
             session = session_manager.get_session(session_id)
         except KeyError:
-            raise HTTPException(404, "Session not found")
+            raise HTTPException(404, t("session.not_found_generic"))
         _reject_compact_during_active_run(session_id)
 
         try:

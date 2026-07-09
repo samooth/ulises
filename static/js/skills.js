@@ -5,6 +5,7 @@
 // content), publish/draft toggle, delete, and "run as slash" via the
 // /<skill-name> path.
 
+import { t } from './i18n.js';
 import uiModule from './ui.js';
 import * as spinnerModule from './spinner.js';
 import { API_BASE } from './apiBase.js';
@@ -584,7 +585,7 @@ async function _saveBuiltinEdit(card, name) {
       body: JSON.stringify({ text: ta.value }),
     });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    uiModule.showToast('Built-in capability updated');
+    uiModule.showToast(t('skills.builtin_updated'));
     builtinSkills = [];  // force reload of built-in list (refreshes "edited" badge)
     await loadSkills();
   } catch (e) { uiModule.showError('Save failed: ' + e.message); }
@@ -595,7 +596,7 @@ async function _revertBuiltin(name) {
   try {
     const res = await fetch(`${API_BASE}/api/skills/builtin/${encodeURIComponent(name)}`, { method: 'DELETE' });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    uiModule.showToast('Reverted to default');
+    uiModule.showToast(t('skills.builtin_reverted'));
     builtinSkills = [];
     await loadSkills();
   } catch (e) { uiModule.showError('Revert failed: ' + e.message); }
@@ -1063,7 +1064,7 @@ async function _saveSkillEdit(card, name) {
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     // Refresh the cached markdown so the preload/expand show the new text.
     _mdCache.set(name, ta.value);
-    uiModule.showToast('Saved');
+    uiModule.showToast(t('common.saved'));
     await loadSkills();  // re-render (frontmatter changes like name/status may have changed)
   } catch (e) {
     uiModule.showError('Save failed: ' + e.message);
@@ -1090,7 +1091,7 @@ async function _deleteSkill(name, card = null) {
       setTimeout(() => { if (card.parentElement) card.remove(); }, 400);
     }
     await loadSkills();
-    uiModule.showToast('Skill deleted');
+    uiModule.showToast(t('skills.deleted'));
   } catch (e) { uiModule.showError('Delete failed: ' + e.message); }
 }
 
@@ -1102,7 +1103,7 @@ async function _setSkillStatus(name, status) {
       body: JSON.stringify({ status }),
     });
     await loadSkills();
-    uiModule.showToast(status === 'published' ? 'Skill approved' : 'Skill moved to draft');
+    uiModule.showToast(status === 'published' ? t('skills.approved') : t('skills.moved_to_draft'));
   } catch (e) { uiModule.showError('Update failed: ' + e.message); }
 }
 
@@ -1433,7 +1434,7 @@ async function _auditAllSkills(opts = {}) {
       ? `${names.length} selected ${names.length === 1 ? 'skill' : 'skills'}`
       : `${names.length} visible ${names.length === 1 ? 'skill' : 'skills'}`;
     if (!names.length) {
-      uiModule.showToast(explicitNames ? 'No selected skills to audit' : 'No visible skills to audit');
+      uiModule.showToast(t('skills.no_skills_to_audit'));
       return;
     }
     const confirmed = await _confirmAuditSkills(label);
@@ -1692,7 +1693,7 @@ async function _bulkDelete() {
   if (deletedNames.length) await new Promise(resolve => setTimeout(resolve, 320));
   _exitSelectMode();
   await loadSkills();
-  uiModule.showToast(`Deleted ${deleted}`);
+  uiModule.showToast(t('skills.deleted_format', { count: deleted }));
 }
 
 async function _loadSkillApprovalThreshold() {
@@ -1722,7 +1723,7 @@ function _selectedNonPassingSkills() {
 async function _bulkDeleteNonPassing() {
   const targets = _selectedNonPassingSkills();
   if (!targets.length) {
-    uiModule.showToast('No selected non-passing skills');
+    uiModule.showToast(t('skills.no_nonpassing'));
     return;
   }
   const thresholdPct = Math.round(_skillApprovalThreshold * 100);
@@ -1751,7 +1752,7 @@ async function _bulkDeleteNonPassing() {
   if (deletedNames.length) await new Promise(resolve => setTimeout(resolve, 320));
   _exitSelectMode();
   await loadSkills();
-  uiModule.showToast(`Deleted ${deleted} non-passing`);
+  uiModule.showToast(t('skills.deleted_nonpassing_format', { count: deleted }));
 }
 
 async function _bulkApprove() {
@@ -1771,7 +1772,7 @@ async function _bulkApprove() {
   }
   _exitSelectMode();
   await loadSkills();
-  uiModule.showToast(`Published ${published}`);
+  uiModule.showToast(t('skills.published_format', { count: published }));
 }
 
 async function _bulkAudit() {
@@ -1832,7 +1833,7 @@ async function _showSkillSource(name) {
         body: JSON.stringify({ markdown: ta.value }),
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      uiModule.showToast('Saved');
+      uiModule.showToast(t('common.saved'));
       wrap.remove();
       await loadSkills();
     } catch (e) {
@@ -1861,7 +1862,7 @@ async function importSkillFromUrl() {
     if (input) input.value = '';
     await loadSkills();
     const name = data.skill?.name || 'skill';
-    uiModule.showToast(`Imported ${name} (${data.files || 1} file(s))`);
+    uiModule.showToast(t('skills.imported_format', { name, files: data.files || 1 }));
     if (name) openSkill(name);
   } catch (err) {
     uiModule.showError('Import failed: ' + err.message);
@@ -1911,7 +1912,7 @@ async function addSkill() {
      'new-skill-category']
       .forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
     await loadSkills();
-    uiModule.showToast('Skill added (draft)');
+    uiModule.showToast(t('skills.added_draft'));
   } catch (err) {
     uiModule.showError('Failed to add skill: ' + err.message);
   }

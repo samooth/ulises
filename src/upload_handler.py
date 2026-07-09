@@ -13,6 +13,7 @@ from datetime import datetime, timedelta
 from typing import Dict, Any, Optional
 from fastapi import HTTPException, UploadFile
 
+from core.translations import t
 from src.upload_limits import format_byte_limit, get_chat_upload_max_bytes
 
 
@@ -581,7 +582,7 @@ class UploadHandler:
             if len(self.upload_rate_log[client_ip]) >= self.upload_rate_limit:
                 raise HTTPException(
                     status_code=429,
-                    detail="Upload rate limit exceeded. Please try again later."
+                    detail=t("upload.rate_limited")
                 )
             
             self.upload_rate_log[client_ip].append(now)
@@ -597,12 +598,12 @@ class UploadHandler:
         file_obj.seek(0)
         
         if file_size == 0:
-            raise HTTPException(400, "File is empty")
+            raise HTTPException(400, t("upload.file_empty"))
             
         if file_size > self.max_upload_size:
             raise HTTPException(
                 status_code=400,
-                detail=f"File size exceeds {format_byte_limit(self.max_upload_size)} limit"
+                detail=t("upload.file_too_large")
             )
         
         # Get original filename and sanitize it
@@ -616,7 +617,7 @@ class UploadHandler:
         if not self.is_safe_file_type(content_type, safe_filename):
             raise HTTPException(
                 status_code=400,
-                detail=f"File type not allowed: {content_type}"
+                detail=t("upload.file_type_not_allowed").format(content_type=content_type)
             )
         
         # Calculate file hash for deduplication
@@ -706,7 +707,7 @@ class UploadHandler:
                 while chunk := file_obj.read(8192):
                     f.write(chunk)
         except Exception as e:
-            raise HTTPException(status_code=500, detail=f"Failed to save file: {str(e)}")
+            raise HTTPException(status_code=500, detail=t("upload.save_failed").format(error=str(e)))
         
         # Create file metadata
         file_metadata = {

@@ -3,13 +3,14 @@ import os
 import uuid
 import logging
 import re
-from typing import Dict, List, Optional, Any
+from typing import Dict, List, Optional
 from urllib.parse import urljoin, urlparse, urlunparse
 
 import httpx
 from fastapi import HTTPException
 
 from core.atomic_io import atomic_write_json
+from core.translations import t
 from core.platform_compat import safe_chmod
 from src.secret_storage import decrypt, encrypt, is_encrypted
 from src.constants import DATA_DIR, INTEGRATIONS_FILE, SETTINGS_FILE
@@ -203,15 +204,15 @@ def mask_integration_secret(integration: Dict[str, Any]) -> Dict[str, Any]:
     return safe
 
 
-def _normalize_integration_base_url(base_url: Any) -> str:
+def _normalize_integration_base_url(base_url: str) -> str:
     if not isinstance(base_url, str) or not base_url.strip():
-        raise ValueError("Integration base URL is required")
+        raise ValueError(t("integration.base_url_required"))
     cleaned = base_url.strip().rstrip("/")
     if "?" in cleaned or "#" in cleaned:
-        raise ValueError("Integration base URL must not include query or fragment")
+        raise ValueError(t("integration.base_url_no_query_fragment"))
     parsed = urlparse(cleaned)
     if parsed.scheme.lower() not in ("http", "https") or not parsed.hostname:
-        raise ValueError("Integration base URL must be an HTTP(S) URL")
+        raise ValueError(t("integration.base_url_must_be_http"))
     return urlunparse(parsed._replace(scheme=parsed.scheme.lower(), query="", fragment="")).rstrip("/")
 
 
@@ -277,7 +278,7 @@ def add_integration(data: Dict[str, Any]) -> Dict[str, Any]:
     integration.setdefault("base_url", "")
 
     if not isinstance(integration.get("name"), str) or not integration["name"].strip():
-        raise HTTPException(400, "Integration name is required")
+        raise HTTPException(400, t("integration.name_required"))
     try:
         integration["base_url"] = _normalize_integration_base_url(integration.get("base_url"))
     except ValueError as exc:
@@ -293,7 +294,7 @@ def update_integration(integration_id: str, data: Dict[str, Any]) -> Optional[Di
     """Update fields on an existing integration. Returns updated integration or None."""
     data = dict(data)
     if "name" in data and (not isinstance(data["name"], str) or not data["name"].strip()):
-        raise HTTPException(400, "Integration name is required")
+        raise HTTPException(400, t("integration.name_required"))
     if "base_url" in data:
         try:
             data["base_url"] = _normalize_integration_base_url(data["base_url"])
@@ -359,10 +360,10 @@ async def execute_api_call(
 
     integration = _find_integration(integration_id)
     if not integration:
-        return {"error": f"Integration not found: {integration_id}", "exit_code": 1}
+        return {"error": t("integration.not_found").format(id=integration_id), "exit_code": 1}
 
     if not integration.get("enabled", True):
-        return {"error": f"Integration '{integration.get('name')}' is disabled", "exit_code": 1}
+        return {"error": t("integration.disabled").format(name=integration.get('name')), "exit_code": 1}
 
     try:
         base_url = _normalize_integration_base_url(integration.get("base_url", ""))
@@ -386,12 +387,12 @@ async def execute_api_call(
 
     # Validate path
     if not path.startswith("/"):
-        return {"error": "Path must start with /", "exit_code": 1}
+        return {"error": t("integration.path_must_start_with_slash"), "exit_code": 1}
     if re.search(r"^https?://", path) or "://" in path:
-        return {"error": "Path must not contain a protocol scheme", "exit_code": 1}
+        return {"error": t("integration.path_no_protocol"), "exit_code": 1}
 
     if "#" in path:
-        return {"error": "Path must not contain a fragment", "exit_code": 1}
+        return {"error": t("integration.path_no_fragment"), "exit_code": 1}
 
     url = _join_integration_url(base_url, path)
     method = method.upper()
@@ -532,12 +533,12 @@ async def execute_api_call(
         return {"output": output, "exit_code": 0}
 
     except httpx.TimeoutException:
-        return {"error": f"Request to {integration.get('name')} timed out", "exit_code": 1}
+        return {"error": t("integration.request_timed_out").format(name=integration.get('name')), "exit_code": 1}
     except httpx.RequestError as exc:
-        return {"error": f"Request failed: {exc}", "exit_code": 1}
+        return {"error": t("integration.request_failed").format(error=exc), "exit_code": 1}
     except Exception as exc:
         log.exception("Unexpected error in execute_api_call")
-        return {"error": f"Unexpected error: {exc}", "exit_code": 1}
+        return {"error": t("integration.unexpected_error").format(error=exc), "exit_code": 1}
 
 
 # ---------------------------------------------------------------------------

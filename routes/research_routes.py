@@ -12,6 +12,7 @@ from typing import Optional
 from fastapi import APIRouter, HTTPException, Query, Request
 from fastapi.responses import HTMLResponse, StreamingResponse
 from pydantic import BaseModel, Field
+from core.translations import t
 from core.middleware import INTERNAL_TOOL_USER
 from src.endpoint_resolver import resolve_endpoint
 from src.auth_helpers import _auth_disabled, get_current_user
@@ -121,12 +122,12 @@ def setup_research_routes(research_handler, session_manager=None) -> APIRouter:
         if not user:
             if _auth_disabled():
                 return ""
-            raise HTTPException(401, "Not authenticated")
+            raise HTTPException(401, t("research.not_authenticated"))
         return user
 
     def _validate_session_id(session_id: str) -> None:
         if not _SESSION_ID_RE.fullmatch(session_id):
-            raise HTTPException(400, "Invalid session ID format")
+            raise HTTPException(400, t("research.invalid_session_id"))
 
     def _owns_in_memory(session_id: str, user: str) -> bool:
         """Ownership check for an in-flight (in-memory) research task.
@@ -167,10 +168,10 @@ def setup_research_routes(research_handler, session_manager=None) -> APIRouter:
         user = _require_user(request)
         _validate_session_id(session_id)
         if not _owns_in_memory(session_id, user):
-            raise HTTPException(404, "No research found for this session")
+            raise HTTPException(404, t("research.no_research"))
         status = research_handler.get_status(session_id)
         if status is None:
-            raise HTTPException(404, "No research found for this session")
+            raise HTTPException(404, t("research.no_research"))
         return status
 
     @router.post("/api/research/cancel/{session_id}")
@@ -178,7 +179,7 @@ def setup_research_routes(research_handler, session_manager=None) -> APIRouter:
         user = _require_user(request)
         _validate_session_id(session_id)
         if not _owns_in_memory(session_id, user):
-            raise HTTPException(404, "No research found for this session")
+            raise HTTPException(404, t("research.no_research"))
         cancelled = research_handler.cancel_research(session_id)
         return {"cancelled": cancelled}
 
@@ -187,10 +188,10 @@ def setup_research_routes(research_handler, session_manager=None) -> APIRouter:
         user = _require_user(request)
         _validate_session_id(session_id)
         if not _owns_in_memory(session_id, user):
-            raise HTTPException(404, "No research result available")
+            raise HTTPException(404, t("research.no_result"))
         result = research_handler.get_result(session_id)
         if result is None:
-            raise HTTPException(404, "No research result available")
+            raise HTTPException(404, t("research.no_result"))
         sources = research_handler.get_sources(session_id) or []
         raw_findings = research_handler.get_raw_findings(session_id) or []
         research_handler.clear_result(session_id)
@@ -201,13 +202,13 @@ def setup_research_routes(research_handler, session_manager=None) -> APIRouter:
         Use BEFORE returning any data or mutating the file."""
         path = Path(DEEP_RESEARCH_DIR) / f"{session_id}.json"
         if not path.exists():
-            raise HTTPException(404, "Research not found")
+            raise HTTPException(404, t("research.not_found"))
         try:
             owner = json.loads(path.read_text(encoding="utf-8")).get("owner")
         except Exception:
-            raise HTTPException(404, "Research not found")
+            raise HTTPException(404, t("research.not_found"))
         if owner != user:
-            raise HTTPException(404, "Research not found")
+            raise HTTPException(404, t("research.not_found"))
 
     @router.get("/api/research/report/{session_id}")
     async def research_report(session_id: str, request: Request):
@@ -220,10 +221,10 @@ def setup_research_routes(research_handler, session_manager=None) -> APIRouter:
             html_content = research_handler.get_report_html(session_id)
         except Exception as e:
             logger.error(f"Visual report generation error: {e}", exc_info=True)
-            raise HTTPException(500, f"Report generation failed: {e}")
+            raise HTTPException(500, t("research.report_failed").format(error=e))
         if html_content is None:
             logger.warning(f"No report data found for session {session_id}")
-            raise HTTPException(404, "No visual report available for this session")
+            raise HTTPException(404, t("research.no_report"))
         return HTMLResponse(content=html_content)
 
     class HideImageRequest(BaseModel):
@@ -238,7 +239,7 @@ def setup_research_routes(research_handler, session_manager=None) -> APIRouter:
         _assert_owns_research(session_id, user)
         ok = research_handler.hide_image(session_id, body.url)
         if not ok:
-            raise HTTPException(404, "Research not found")
+            raise HTTPException(404, t("research.not_found"))
         return {"ok": True}
 
     @router.post("/api/research/{session_id}/unhide-images")
@@ -249,7 +250,7 @@ def setup_research_routes(research_handler, session_manager=None) -> APIRouter:
         _assert_owns_research(session_id, user)
         ok = research_handler.unhide_all_images(session_id)
         if not ok:
-            raise HTTPException(404, "Research not found")
+            raise HTTPException(404, t("research.not_found"))
         return {"ok": True}
 
     @router.get("/api/research/library")
@@ -314,14 +315,14 @@ def setup_research_routes(research_handler, session_manager=None) -> APIRouter:
         _validate_session_id(session_id)
         path = Path(DEEP_RESEARCH_DIR) / f"{session_id}.json"
         if not path.exists():
-            raise HTTPException(404, "Research not found")
+            raise HTTPException(404, t("research.not_found"))
         try:
             data = json.loads(path.read_text(encoding="utf-8"))
         except Exception as e:
-            raise HTTPException(500, f"Failed to read research: {e}")
+            raise HTTPException(500, t("research.read_failed").format(error=e))
         # SECURITY: 404 (not 403) so we don't leak that the report exists.
         if data.get("owner") != user:
-            raise HTTPException(404, "Research not found")
+            raise HTTPException(404, t("research.not_found"))
         return data
 
     @router.post("/api/research/{session_id}/archive")
@@ -331,17 +332,17 @@ def setup_research_routes(research_handler, session_manager=None) -> APIRouter:
         _validate_session_id(session_id)
         path = Path(DEEP_RESEARCH_DIR) / f"{session_id}.json"
         if not path.exists():
-            raise HTTPException(404, "Research not found")
+            raise HTTPException(404, t("research.not_found"))
         try:
             data = json.loads(path.read_text(encoding="utf-8"))
             if data.get("owner") != user:
-                raise HTTPException(404, "Research not found")
+                raise HTTPException(404, t("research.not_found"))
             data["archived"] = bool(archived)
             path.write_text(json.dumps(data), encoding="utf-8")
         except HTTPException:
             raise
         except Exception as e:
-            raise HTTPException(500, f"Failed to update research: {e}")
+            raise HTTPException(500, t("research.update_failed").format(error=e))
         return {"ok": True, "id": session_id, "archived": bool(archived)}
 
     @router.delete("/api/research/{session_id}")
@@ -357,11 +358,11 @@ def setup_research_routes(research_handler, session_manager=None) -> APIRouter:
             try:
                 data = json.loads(json_path.read_text(encoding="utf-8"))
                 if data.get("owner") != user:
-                    raise HTTPException(404, "Research not found")
+                    raise HTTPException(404, t("research.not_found"))
             except HTTPException:
                 raise
             except Exception:
-                raise HTTPException(404, "Research not found")
+                raise HTTPException(404, t("research.not_found"))
             json_path.unlink()
             deleted = True
         return {"deleted": deleted}
@@ -395,7 +396,7 @@ def setup_research_routes(research_handler, session_manager=None) -> APIRouter:
                     try:
                         privs = auth_mgr.get_privileges(tool_owner) or {}
                         if not privs.get("can_use_research", True):
-                            raise HTTPException(403, f"Your account is not allowed to can use research.")
+                            raise HTTPException(403, t("research.not_allowed"))
                     except HTTPException:
                         raise
                     except Exception:
@@ -412,10 +413,10 @@ def setup_research_routes(research_handler, session_manager=None) -> APIRouter:
                 # reads as 404 so the endpoint's existence isn't revealed.
                 ep = _owned_enabled_endpoint(db, user, body.endpoint_id)
                 if not ep:
-                    raise HTTPException(404, "Endpoint not found or disabled")
+                    raise HTTPException(404, t("research.endpoint_not_found"))
                 resolved = _resolve_endpoint_runtime(ep, owner=user, model=body.model)
                 if not resolved:
-                    raise HTTPException(400, "Endpoint is not configured with a usable model.")
+                    raise HTTPException(400, t("research.endpoint_no_model"))
                 ep_url, ep_model, ep_headers = resolved
             finally:
                 db.close()
@@ -447,7 +448,7 @@ def setup_research_routes(research_handler, session_manager=None) -> APIRouter:
                 finally:
                     db.close()
             if not ep_url:
-                raise HTTPException(400, "No endpoints configured. Add one in Settings first.")
+                raise HTTPException(400, t("research.no_endpoints"))
             if body.model:
                 ep_model = body.model
 
@@ -475,7 +476,7 @@ def setup_research_routes(research_handler, session_manager=None) -> APIRouter:
         user = _require_user(request)
         _validate_session_id(session_id)
         if not _owns_in_memory(session_id, user):
-            raise HTTPException(404, "No research found for this session")
+            raise HTTPException(404, t("research.no_research"))
         async def _generate():
             last_progress = None
             while True:
@@ -509,7 +510,7 @@ def setup_research_routes(research_handler, session_manager=None) -> APIRouter:
         user = _require_user(request)
         _validate_session_id(session_id)
         if not _owns_in_memory(session_id, user):
-            raise HTTPException(404, "No research found for this session")
+            raise HTTPException(404, t("research.no_research"))
         result = research_handler.get_result(session_id)
         if result is None:
             p = Path(DEEP_RESEARCH_DIR) / f"{session_id}.json"
@@ -521,7 +522,7 @@ def setup_research_routes(research_handler, session_manager=None) -> APIRouter:
                     "raw_findings": d.get("raw_findings", []),
                     "category": d.get("category") or "",
                 }
-            raise HTTPException(404, "No research result available")
+            raise HTTPException(404, t("research.no_result"))
         sources = research_handler.get_sources(session_id) or []
         raw_findings = research_handler.get_raw_findings(session_id) or []
         return {"result": result, "sources": sources, "raw_findings": raw_findings, "category": ""}
@@ -543,9 +544,9 @@ def setup_research_routes(research_handler, session_manager=None) -> APIRouter:
         # another user's report by guessing its session ID. Mirrors every other
         # endpoint in this file (see result_peek above).
         if not _owns_in_memory(session_id, user):
-            raise HTTPException(404, "No research found for this session")
+            raise HTTPException(404, t("research.no_research"))
         if session_manager is None:
-            raise HTTPException(500, "session_manager not configured")
+            raise HTTPException(500, t("research.session_manager_not_configured"))
 
         # Load research data — prefer in-memory result, fall back to disk
         result = research_handler.get_result(session_id)
@@ -565,7 +566,7 @@ def setup_research_routes(research_handler, session_manager=None) -> APIRouter:
                 logger.warning(f"Could not read research JSON for spinoff: {e}")
 
         if not result:
-            raise HTTPException(404, "No research result available for this session")
+            raise HTTPException(404, t("research.no_result"))
 
         # Inherit endpoint/model/headers from the source session when possible.
         # For panel-launched research (rp-* IDs), there is no chat session, so
@@ -619,7 +620,7 @@ def setup_research_routes(research_handler, session_manager=None) -> APIRouter:
                 db.close()
 
         if not ep_url or not ep_model:
-            raise HTTPException(400, "No endpoint configured — add one in Settings first")
+            raise HTTPException(400, t("research.no_endpoint_configured"))
 
         # Create new session
         new_sid = str(uuid.uuid4())

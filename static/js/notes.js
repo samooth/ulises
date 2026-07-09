@@ -12,6 +12,8 @@ import { snapModalToZone } from './tileManager.js';
 import { applyEdgeDock, clearDockSide } from './modalSnap.js';
 import { topToolWindowZ } from './toolWindowZOrder.js';
 import { API_BASE } from './apiBase.js';
+import { t } from './i18n.js';
+import { t } from './i18n.js';
 let _open = false;
 let _notes = [];
 let _editingId = null;
@@ -410,7 +412,7 @@ function _undoArchive(note, prevIdx) {
     const i = _notes.findIndex(n => n.id === note.id);
     if (i >= 0) _notes.splice(i, 1);
     _renderNotes();
-    uiModule.showError('Undo failed');
+    uiModule.showError(t('notes.undo_failed'));
   });
 }
 
@@ -1326,7 +1328,7 @@ export function openPanel() {
     _exitSelectMode();
     await _fetchNotes();
     _renderNotes();
-    uiModule.showToast(`Archived ${ids.length}`);
+    uiModule.showToast(t('notes.archived_count', { count: ids.length }));
   });
   document.getElementById('notes-bulk-delete').addEventListener('click', async () => {
     const ids = [..._selectedIds];
@@ -1339,7 +1341,7 @@ export function openPanel() {
     _exitSelectMode();
     await _fetchNotes();
     _renderNotes();
-    uiModule.showToast(`Deleted ${ids.length}`);
+    uiModule.showToast(t('notes.deleted_count', { count: ids.length }));
   });
   // Escape: exit select mode first (if active), otherwise close the panel.
   // Skip when the user is editing a form field — those have their own
@@ -2249,7 +2251,7 @@ function _bindCardEvents(body) {
         note.pinned = prevPinned;
         note.sort_order = prevSortOrder;
         _renderNotes();
-        uiModule.showError('Failed to pin');
+        uiModule.showError(t('notes.pin_failed'));
       });
     });
   });
@@ -2265,7 +2267,7 @@ function _bindCardEvents(body) {
       d.style.background = _dotBg(d.dataset.color, newColor);
     });
     try { await _patchNote(id, { color: newColor || null }); const note = _notes.find(n => n.id === id); if (note) note.color = newColor; }
-    catch { uiModule.showError('Failed to update color'); }
+    catch { uiModule.showError(t('notes.update_color_failed')); }
   };
   body.querySelectorAll('.note-card-color-dot').forEach(dot => {
     dot.addEventListener('click', (e) => {
@@ -2335,11 +2337,11 @@ function _bindCardEvents(body) {
       const finish = () => {
         _renderNotes();
         _patchNote(id, { archived: true }).then(() => {
-          uiModule.showToast('Archived', { duration: 6000, action: 'Undo', actionIcon: _undoIcon, onAction: undo, actionHint: 'Ctrl+Z' });
+          uiModule.showToast(t('notes.archived'), { duration: 6000, action: t('notes.undo'), actionIcon: _undoIcon, onAction: undo, actionHint: 'Ctrl+Z' });
         }).catch(() => {
           _notes.splice(idx, 0, removed);
           _renderNotes();
-          uiModule.showError('Failed to archive');
+          uiModule.showError(t('notes.archive_failed'));
         });
       };
       if (card) {
@@ -2362,10 +2364,10 @@ function _bindCardEvents(body) {
       if (idx < 0) return;
       const removed = _notes.splice(idx, 1)[0];
       _renderNotes();
-      _patchNote(id, { archived: false }).then(() => uiModule.showToast('Unarchived')).catch(() => {
+      _patchNote(id, { archived: false }).then(() => uiModule.showToast(t('common.unarchived'))).catch(() => {
         _notes.splice(idx, 0, removed);
         _renderNotes();
-        uiModule.showError('Failed to unarchive');
+        uiModule.showError(t('notes.unarchive_failed'));
       });
     });
   });
@@ -2378,10 +2380,10 @@ function _bindCardEvents(body) {
       if (idx < 0) return;
       const removed = _notes.splice(idx, 1)[0];
       _renderNotes();
-      _deleteNoteApi(id).then(() => uiModule.showToast('Deleted')).catch(() => {
+      _deleteNoteApi(id).then(() => uiModule.showToast(t('common.deleted'))).catch(() => {
         _notes.splice(idx, 0, removed);
         _renderNotes();
-        uiModule.showError('Failed to delete');
+        uiModule.showError(t('notes.delete_failed'));
       });
     });
   });
@@ -2413,11 +2415,11 @@ function _bindCardEvents(body) {
         _pushUndo({ label: 'archive', run: undo });
         const _undoIcon = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;"><polyline points="9 14 4 9 9 4"/><path d="M4 9h11a5 5 0 0 1 5 5v0a5 5 0 0 1-5 5H9"/></svg>';
         _patchNote(id, { archived: true }).then(() => {
-          uiModule.showToast('Archived', { duration: 6000, action: 'Undo', actionIcon: _undoIcon, onAction: undo, actionHint: 'Ctrl+Z' });
+          uiModule.showToast(t('notes.archived'), { duration: 6000, action: t('notes.undo'), actionIcon: _undoIcon, onAction: undo, actionHint: 'Ctrl+Z' });
         }).catch(() => {
           _notes.splice(curIdx, 0, removed);
           _renderNotes();
-          uiModule.showError('Failed to archive');
+          uiModule.showError(t('notes.archive_failed'));
         });
       };
       if (card) {
@@ -2438,10 +2440,10 @@ function _bindCardEvents(body) {
       if (idx < 0) return;
       const removed = _notes.splice(idx, 1)[0];
       _renderNotes();
-      _patchNote(id, { archived: false }).then(() => uiModule.showToast('Unarchived')).catch(() => {
+      _patchNote(id, { archived: false }).then(() => uiModule.showToast(t('common.unarchived'))).catch(() => {
         _notes.splice(idx, 0, removed);
         _renderNotes();
-        uiModule.showError('Failed to unarchive');
+        uiModule.showError(t('notes.unarchive_failed'));
       });
     });
   });
@@ -2457,7 +2459,7 @@ function _bindCardEvents(body) {
       _deleteNoteApi(id).catch(() => {
         _notes.splice(idx, 0, removed);
         _renderNotes();
-        uiModule.showError('Failed to delete');
+        uiModule.showError(t('notes.delete_failed'));
       });
     });
   });
@@ -2511,7 +2513,7 @@ function _bindCardEvents(body) {
       _patchNote(noteId, { items: note.items }).catch(() => {
         note.items.splice(idx, 0, removed);
         _renderNotes();
-        uiModule.showError('Failed to remove item');
+        uiModule.showError(t('notes.remove_item_failed'));
       });
     });
   });
@@ -2553,7 +2555,7 @@ function _bindCardEvents(body) {
       _patchNote(noteId, { items }).catch(() => {
         note.items = items.slice(0, -1);
         _renderNotes();
-        uiModule.showError('Failed to add item');
+        uiModule.showError(t('notes.add_item_failed'));
       });
     });
   });
@@ -3435,7 +3437,7 @@ function _buildForm(note = null) {
         form.querySelector('.note-form-header').after(wrap);
         wrap.querySelector('.note-form-image-rm').addEventListener('click', () => { wrap.remove(); currentImageUrl = ''; });
         wrap.querySelector('img').src = currentImageUrl;
-      } catch (err) { uiModule.showError('Image upload failed'); }
+      } catch (err) { uiModule.showError(t('notes.image_upload_failed')); }
       photoInput.value = '';
     });
   }
@@ -3562,7 +3564,7 @@ function _buildForm(note = null) {
       // can't be re-rendered later without the URL.
       const canvas = form.querySelector('.note-form-canvas');
       const url = await _uploadCanvasAsPng(canvas);
-      if (!url) { uiModule.showError('Failed to save drawing'); return; }
+      if (!url) { uiModule.showError(t('notes.save_drawing_failed')); return; }
       payload.image_url = url;
     } else if (currentType === 'goal') {
       // Legacy: existing goal-type notes still edit through this branch.
@@ -3620,7 +3622,7 @@ function _buildForm(note = null) {
         _renderNotes();
       }
     }).catch(err => {
-      uiModule.showError('Save failed: ' + err.message);
+      uiModule.showError(t('notes.save_failed', { msg: err.message }));
       _fetchNotes().then(() => _renderNotes());
     });
     } finally {
@@ -3668,11 +3670,11 @@ function _buildForm(note = null) {
     _pushUndo({ label: 'archive', run: undo });
     const _undoIcon = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;"><polyline points="9 14 4 9 9 4"/><path d="M4 9h11a5 5 0 0 1 5 5v0a5 5 0 0 1-5 5H9"/></svg>';
     _patchNote(id, { archived: true }).then(() => {
-      uiModule.showToast('Archived', { duration: 6000, action: 'Undo', actionIcon: _undoIcon, onAction: undo, actionHint: 'Ctrl+Z' });
+      uiModule.showToast(t('notes.archived'), { duration: 6000, action: t('notes.undo'), actionIcon: _undoIcon, onAction: undo, actionHint: 'Ctrl+Z' });
     }).catch(() => {
       _notes.splice(idx, 0, removed);
       _renderNotes();
-      uiModule.showError('Failed to archive');
+      uiModule.showError(t('notes.archive_failed'));
     });
   });
   form.querySelector('.note-form-delete-btn')?.addEventListener('click', async () => {
@@ -3688,8 +3690,8 @@ function _buildForm(note = null) {
     if (idx >= 0) _notes.splice(idx, 1);
     _editingId = null;
     _renderNotes();
-    _deleteNoteApi(id).then(() => uiModule.showToast('Deleted')).catch(() => {
-      uiModule.showError('Failed to delete');
+    _deleteNoteApi(id).then(() => uiModule.showToast(t('common.deleted'))).catch(() => {
+      uiModule.showError(t('notes.delete_failed'));
       _fetchNotes().then(() => _renderNotes());
     });
   });
@@ -4288,7 +4290,7 @@ function _createNote(type = 'todo') {
   form.classList.add('note-form-new');
   body.prepend(form);
   form.querySelector('.note-form-title').focus();
-  if (restored) uiModule.showToast('Restored unsaved note');
+  if (restored) uiModule.showToast(t('notes.restored_unsaved_note'));
 }
 
 // Build the plain-text/markdown form of a note for clipboard copy.
@@ -4416,10 +4418,10 @@ async function _agentSolveNote(id) {
   const note = _notes.find(n => n.id === id);
   if (!note) return;
   const prompt = _noteToAgentPrompt(note);
-  if (!prompt) { uiModule.showToast('Nothing to solve — note is empty'); return; }
+  if (!prompt) { uiModule.showToast(t('notes.nothing_to_solve_note_empty')); return; }
   try {
     const dc = await (await fetch(`${API_BASE}/api/default-chat`, { credentials: 'same-origin' })).json();
-    if (!dc.endpoint_url || !dc.model) { uiModule.showError('No default chat model configured'); return; }
+    if (!dc.endpoint_url || !dc.model) { uiModule.showError(t('notes.no_default_chat_model')); return; }
 
     // 1. Create the session server-side (no UI switch). skip_validation
     //    avoids re-probing — the default-chat endpoint is already known good.
@@ -4431,7 +4433,7 @@ async function _agentSolveNote(id) {
     if (dc.endpoint_id) csFd.append('endpoint_id', dc.endpoint_id);
     csFd.append('skip_validation', 'true');
     const csRes = await fetch(`${API_BASE}/api/session`, { method: 'POST', credentials: 'same-origin', body: csFd });
-    if (!csRes.ok) { uiModule.showError('Could not create agent session'); return; }
+    if (!csRes.ok) { uiModule.showError(t('notes.create_agent_session_failed')); return; }
     const sess = await csRes.json();
     const sid = sess.id;
 
@@ -4461,9 +4463,9 @@ async function _agentSolveNote(id) {
       })
       .catch(() => {});
 
-    uiModule.showToast('Agent working in background — tap the Agent tag when ready');
+    uiModule.showToast(t('notes.agent_working_background'));
   } catch (e) {
-    uiModule.showError('Agent failed: ' + (e.message || e));
+    uiModule.showError(t('notes.agent_failed', { msg: e.message || e }));
   }
 }
 
@@ -4478,7 +4480,7 @@ async function _agentSolveTodoItem(noteId, idx) {
   const item = note.items[idx];
   const itemText = (item && (item.text || '').trim()) || '';
   if (!itemText) {
-    uiModule.showToast('Nothing to solve — item is empty');
+    uiModule.showToast(t('notes.nothing_to_solve_item_empty'));
     return;
   }
   const titleCtx = (note.title || '').trim();
@@ -4487,7 +4489,7 @@ async function _agentSolveTodoItem(noteId, idx) {
     : `Help me with this todo: ${itemText}\n\nThe source note is read-only. Do not edit, replace, or update it.`;
   try {
     const dc = await (await fetch(`${API_BASE}/api/default-chat`, { credentials: 'same-origin' })).json();
-    if (!dc.endpoint_url || !dc.model) { uiModule.showError('No default chat model configured'); return; }
+    if (!dc.endpoint_url || !dc.model) { uiModule.showError(t('notes.no_default_chat_model')); return; }
 
     const label = itemText.slice(0, 40);
     const csFd = new FormData();
@@ -4497,7 +4499,7 @@ async function _agentSolveTodoItem(noteId, idx) {
     if (dc.endpoint_id) csFd.append('endpoint_id', dc.endpoint_id);
     csFd.append('skip_validation', 'true');
     const csRes = await fetch(`${API_BASE}/api/session`, { method: 'POST', credentials: 'same-origin', body: csFd });
-    if (!csRes.ok) { uiModule.showError('Could not create agent session'); return; }
+    if (!csRes.ok) { uiModule.showError(t('notes.create_agent_session_failed')); return; }
     const sess = await csRes.json();
     const sid = sess.id;
     const sessionTitle = 'Agent: ' + label;
@@ -4541,9 +4543,9 @@ async function _agentSolveTodoItem(noteId, idx) {
       })
       .catch(() => {});
 
-    uiModule.showToast('Agent working on this item — tap the Agent tag when ready');
+    uiModule.showToast(t('notes.agent_working_item'));
   } catch (e) {
-    uiModule.showError('Agent failed: ' + (e.message || e));
+    uiModule.showError(t('notes.agent_failed', { msg: e.message || e }));
   }
 }
 
@@ -4595,7 +4597,7 @@ function _editNote(id) {
   const { note: _n, restored } = _applyDraftToNote(note, id);
   const form = _buildForm(_n);
   card.replaceWith(form);
-  if (restored) uiModule.showToast('Restored unsaved changes');
+  if (restored) uiModule.showToast(t('notes.restored_unsaved_changes'));
   // Pinned notes live in the first masonry column — the edit form has
   // column-span:all, which can leave the form rendered above the fold or
   // visually buried under neighboring pinned cards. Bring it into view
@@ -4645,8 +4647,8 @@ async function _deleteNote(id) {
     ? await uiModule.styledConfirm('Delete this note?', { confirmText: 'Delete', danger: true })
     : confirm('Delete this note?');
   if (!ok) return;
-  try { await _deleteNoteApi(id); await _fetchNotes(); _renderNotes(); uiModule.showToast('Deleted'); }
-  catch (err) { uiModule.showError(err.message); }
+  try { await _deleteNoteApi(id); await _fetchNotes(); _renderNotes(); uiModule.showToast(t('common.deleted')); }
+  catch (err) { uiModule.showError(t('notes.delete_failed', { msg: err.message })); }
 }
 
 // ────────────────────────────────────────────────────────────────────
@@ -4690,7 +4692,7 @@ function _openMobileFullscreenEdit(id, fromCard) {
   const { note: _n, restored } = _applyDraftToNote(note, id);
   const form = _buildForm(_n);
   body.appendChild(form);
-  if (restored) uiModule.showToast('Restored unsaved changes');
+  if (restored) uiModule.showToast(t('notes.restored_unsaved_changes'));
   document.body.appendChild(overlay);
   _mobileFsOverlay = overlay;
 

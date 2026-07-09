@@ -13,6 +13,7 @@ from pydantic import BaseModel
 from core.database import SessionLocal, ScheduledTask, TaskRun
 from core.middleware import INTERNAL_TOOL_USER
 from core.constants import internal_api_base
+from core.translations import t
 from src.auth_helpers import get_current_user
 from src.constants import DATA_DIR, EMAIL_URGENCY_CACHE_DIR
 from src.task_scheduler import compute_next_run, HOUSEKEEPING_DEFAULTS
@@ -445,13 +446,13 @@ def setup_task_routes(task_scheduler) -> APIRouter:
         if not target_id:
             return None
         if current_task_id and target_id == current_task_id:
-            raise HTTPException(400, "Task cannot chain to itself")
+            raise HTTPException(400, t("tasks.cannot_chain_to_self"))
         q = db.query(ScheduledTask).filter(ScheduledTask.id == target_id)
         if user:
             q = q.filter(ScheduledTask.owner == user)
         target = q.first()
         if not target:
-            raise HTTPException(404, "Chained task not found")
+            raise HTTPException(404, t("tasks.chained_not_found"))
         return target.id
 
     @router.post("")
@@ -460,28 +461,28 @@ def setup_task_routes(task_scheduler) -> APIRouter:
 
         # Validate
         if req.task_type in ("llm", "research") and not req.prompt:
-            raise HTTPException(400, "Prompt is required for LLM/research tasks")
+            raise HTTPException(400, t("tasks.prompt_required"))
         if req.task_type == "action" and not req.action:
-            raise HTTPException(400, "Action name is required for action tasks")
+            raise HTTPException(400, t("tasks.action_name_required"))
         # Block shell-executing action types for non-admins. action_run_local
         # uses subprocess.run(shell=True) and ssh_command / run_script run
         # arbitrary commands.
         if req.task_type == "action" and req.action in _ADMIN_ONLY_ACTIONS and not _is_admin(user):
-            raise HTTPException(403, f"Action '{req.action}' requires admin privileges")
+            raise HTTPException(403, t("tasks.admin_required_for_action").format(action=req.action))
         if req.trigger_type == "schedule" and not req.schedule:
-            raise HTTPException(400, "Schedule is required for schedule-triggered tasks")
+            raise HTTPException(400, t("tasks.schedule_required"))
         if req.trigger_type == "schedule" and req.schedule == "cron" and not req.cron_expression:
-            raise HTTPException(400, "Cron expression is required for cron schedule")
+            raise HTTPException(400, t("tasks.cron_expression_required"))
         if req.trigger_type == "schedule" and req.schedule == "cron" and req.cron_expression:
             try:
                 from croniter import croniter
                 croniter(req.cron_expression)
             except Exception:
-                raise HTTPException(400, "Invalid cron expression")
+                raise HTTPException(400, t("tasks.invalid_cron_expression"))
         if req.trigger_type == "event" and not req.trigger_event:
-            raise HTTPException(400, "Event name is required for event-triggered tasks")
+            raise HTTPException(400, t("tasks.event_name_required"))
         if req.trigger_type == "event" and not req.trigger_count:
-            raise HTTPException(400, "Trigger count is required for event-triggered tasks")
+            raise HTTPException(400, t("tasks.trigger_count_required"))
 
         # Auto-generate name
         name = req.name
@@ -502,7 +503,7 @@ def setup_task_routes(task_scheduler) -> APIRouter:
                 try:
                     sched_date = datetime.fromisoformat(req.scheduled_date.replace("Z", "+00:00")).replace(tzinfo=None)
                 except ValueError:
-                    raise HTTPException(400, "Invalid scheduled_date format")
+                    raise HTTPException(400, t("tasks.invalid_scheduled_date_format"))
             next_run = compute_next_run(
                 req.schedule, req.scheduled_time,
                 req.scheduled_day, sched_date,
@@ -529,9 +530,9 @@ def setup_task_routes(task_scheduler) -> APIRouter:
                     ScheduledTask.id == req.then_task_id
                 ).first()
                 if not chain_target:
-                    raise HTTPException(400, "Chained task not found")
+                    raise HTTPException(400, t("tasks.chained_not_found"))
                 if chain_target.owner != user:
-                    raise HTTPException(403, "Cannot chain to another user's task")
+                    raise HTTPException(403, t("tasks.cannot_chain_to_other_user"))
             task = ScheduledTask(
                 id=task_id,
                 owner=user,
@@ -584,9 +585,9 @@ def setup_task_routes(task_scheduler) -> APIRouter:
         try:
             task = db.query(ScheduledTask).filter(ScheduledTask.id == task_id).first()
             if not task:
-                raise HTTPException(404, "Task not found")
+                raise HTTPException(404, t("tasks.not_found"))
             if user and task.owner != user:
-                raise HTTPException(403, "Access denied")
+                raise HTTPException(403, t("tasks.access_denied"))
             action = task.action or ""
         finally:
             db.close()
@@ -600,7 +601,7 @@ def setup_task_routes(task_scheduler) -> APIRouter:
         }
         tables = cache_tables.get(action)
         if not tables:
-            raise HTTPException(400, "This task has no clearable cache")
+            raise HTTPException(400, t("tasks.no_clearable_cache"))
 
         import sqlite3
         from pathlib import Path
@@ -662,9 +663,9 @@ def setup_task_routes(task_scheduler) -> APIRouter:
         try:
             task = db.query(ScheduledTask).filter(ScheduledTask.id == task_id).first()
             if not task:
-                raise HTTPException(404, "Task not found")
+                raise HTTPException(404, t("tasks.not_found"))
             if user and task.owner != user:
-                raise HTTPException(403, "Access denied")
+                raise HTTPException(403, t("tasks.access_denied"))
             return _task_to_dict(task)
         finally:
             db.close()
@@ -676,9 +677,9 @@ def setup_task_routes(task_scheduler) -> APIRouter:
         try:
             task = db.query(ScheduledTask).filter(ScheduledTask.id == task_id).first()
             if not task:
-                raise HTTPException(404, "Task not found")
+                raise HTTPException(404, t("tasks.not_found"))
             if user and task.owner != user:
-                raise HTTPException(403, "Access denied")
+                raise HTTPException(403, t("tasks.access_denied"))
 
             if req.name is not None:
                 task.name = req.name
@@ -689,7 +690,7 @@ def setup_task_routes(task_scheduler) -> APIRouter:
             if req.action is not None:
                 # Same admin-only gate as create — see CRIT-C.
                 if req.action in _ADMIN_ONLY_ACTIONS and not _is_admin(user):
-                    raise HTTPException(403, f"Action '{req.action}' requires admin privileges")
+                    raise HTTPException(403, t("tasks.admin_required_for_action").format(action=req.action))
                 task.action = req.action
             if req.output_target is not None:
                 task.output_target = req.output_target
@@ -719,7 +720,7 @@ def setup_task_routes(task_scheduler) -> APIRouter:
                         from croniter import croniter
                         croniter(req.cron_expression)
                     except Exception:
-                        raise HTTPException(400, "Invalid cron expression")
+                        raise HTTPException(400, t("tasks.invalid_cron_expression"))
                 task.cron_expression = req.cron_expression or None
 
             # Recompute next_run if schedule changed
@@ -739,7 +740,7 @@ def setup_task_routes(task_scheduler) -> APIRouter:
                         req.scheduled_date.replace("Z", "+00:00")
                     ).replace(tzinfo=None)
                 except ValueError:
-                    raise HTTPException(400, "Invalid scheduled_date format")
+                    raise HTTPException(400, t("tasks.invalid_scheduled_date_format"))
                 schedule_changed = True
 
             if req.cron_expression is not None:
@@ -765,9 +766,9 @@ def setup_task_routes(task_scheduler) -> APIRouter:
         try:
             task = db.query(ScheduledTask).filter(ScheduledTask.id == task_id).first()
             if not task:
-                raise HTTPException(404, "Task not found")
+                raise HTTPException(404, t("tasks.not_found"))
             if user and task.owner != user:
-                raise HTTPException(403, "Access denied")
+                raise HTTPException(403, t("tasks.access_denied"))
             # Cascade: cookbook_serve tasks may have a linked calendar
             # event (created via the "Create event in calendar" toggle
             # in the schedule modal). If so, delete the calendar event
@@ -787,9 +788,9 @@ def setup_task_routes(task_scheduler) -> APIRouter:
         try:
             task = db.query(ScheduledTask).filter(ScheduledTask.id == task_id).first()
             if not task:
-                raise HTTPException(404, "Task not found")
+                raise HTTPException(404, t("tasks.not_found"))
             if user and task.owner != user:
-                raise HTTPException(403, "Access denied")
+                raise HTTPException(403, t("tasks.access_denied"))
             task.status = "paused"
             db.commit()
             return {"ok": True, "status": "paused"}
@@ -803,9 +804,9 @@ def setup_task_routes(task_scheduler) -> APIRouter:
         try:
             task = db.query(ScheduledTask).filter(ScheduledTask.id == task_id).first()
             if not task:
-                raise HTTPException(404, "Task not found")
+                raise HTTPException(404, t("tasks.not_found"))
             if user and task.owner != user:
-                raise HTTPException(403, "Access denied")
+                raise HTTPException(403, t("tasks.access_denied"))
             task.status = "active"
             if (task.trigger_type or "schedule") == "schedule":
                 task.next_run = compute_next_run(
@@ -826,12 +827,12 @@ def setup_task_routes(task_scheduler) -> APIRouter:
         try:
             task = db.query(ScheduledTask).filter(ScheduledTask.id == task_id).first()
             if not task:
-                raise HTTPException(404, "Task not found")
+                raise HTTPException(404, t("tasks.not_found"))
             if user and task.owner != user:
-                raise HTTPException(403, "Access denied")
+                raise HTTPException(403, t("tasks.access_denied"))
             defs = HOUSEKEEPING_DEFAULTS.get(task.action) if task.action else None
             if not defs:
-                raise HTTPException(400, "Not a built-in task")
+                raise HTTPException(400, t("tasks.not_a_builtin_task"))
             task.name = defs["name"]
             task.schedule = defs["schedule"]
             task.scheduled_time = defs["scheduled_time"]
@@ -865,14 +866,14 @@ def setup_task_routes(task_scheduler) -> APIRouter:
         try:
             task = db.query(ScheduledTask).filter(ScheduledTask.id == task_id).first()
             if not task:
-                raise HTTPException(404, "Task not found")
+                raise HTTPException(404, t("tasks.not_found"))
             if user and task.owner != user:
-                raise HTTPException(403, "Access denied")
+                raise HTTPException(403, t("tasks.access_denied"))
         finally:
             db.close()
         started = await task_scheduler.run_task_now(task_id, force=force)
         if not started:
-            raise HTTPException(409, "Task is already running")
+            raise HTTPException(409, t("tasks.already_running"))
         return {"ok": True, "message": "Task triggered" + (" in parallel" if force else "")}
 
     @router.post("/{task_id}/stop")
@@ -882,14 +883,14 @@ def setup_task_routes(task_scheduler) -> APIRouter:
         try:
             task = db.query(ScheduledTask).filter(ScheduledTask.id == task_id).first()
             if not task:
-                raise HTTPException(404, "Task not found")
+                raise HTTPException(404, t("tasks.not_found"))
             if user and task.owner != user:
-                raise HTTPException(403, "Access denied")
+                raise HTTPException(403, t("tasks.access_denied"))
         finally:
             db.close()
         stopped = await task_scheduler.stop_task(task_id)
         if not stopped:
-            raise HTTPException(404, "Task is not running")
+            raise HTTPException(404, t("tasks.not_running"))
         return {"ok": True, "message": "Task stopped"}
 
     @router.get("/runs/recent")
@@ -960,9 +961,9 @@ def setup_task_routes(task_scheduler) -> APIRouter:
         try:
             task = db.query(ScheduledTask).filter(ScheduledTask.id == task_id).first()
             if not task:
-                raise HTTPException(404, "Task not found")
+                raise HTTPException(404, t("tasks.not_found"))
             if user and task.owner != user:
-                raise HTTPException(403, "Access denied")
+                raise HTTPException(403, t("tasks.access_denied"))
             runs = db.query(TaskRun).filter(TaskRun.task_id == task_id)\
                 .order_by(TaskRun.started_at.desc())\
                 .offset(offset).limit(limit).all()
@@ -1045,12 +1046,12 @@ def setup_task_routes(task_scheduler) -> APIRouter:
                 ScheduledTask.status == "active",
             ).first()
             if not task:
-                raise HTTPException(404, "Not found")
+                raise HTTPException(404, t("tasks.not_found"))
         finally:
             db.close()
         started = await task_scheduler.run_task_now(task_id)
         if not started:
-            raise HTTPException(409, "Task is already running")
+            raise HTTPException(409, t("tasks.already_running"))
         return {"ok": True, "message": "Task triggered via webhook"}
 
     @router.post("/{task_id}/webhook-regenerate")
@@ -1060,9 +1061,9 @@ def setup_task_routes(task_scheduler) -> APIRouter:
         try:
             task = db.query(ScheduledTask).filter(ScheduledTask.id == task_id).first()
             if not task:
-                raise HTTPException(404, "Task not found")
+                raise HTTPException(404, t("tasks.not_found"))
             if user and task.owner != user:
-                raise HTTPException(403, "Access denied")
+                raise HTTPException(403, t("tasks.access_denied"))
             task.webhook_token = secrets.token_urlsafe(32)
             db.commit()
             return {"ok": True, "webhook_token": task.webhook_token}

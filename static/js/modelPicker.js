@@ -6,6 +6,7 @@ import uiModule from './ui.js';
 import settingsModule from './settings.js';
 import { sortModelObjects } from './modelSort.js';
 import { API_BASE } from './apiBase.js';
+import { t } from './i18n.js';
 
 // ── Recent + Favorites persistence ──
 // Recent is auto-tracked (last 5 picks, most-recent-first) and lives in its
@@ -399,7 +400,7 @@ function _initModelPickerDropdown() {
         const idx = favs.indexOf(m.mid);
         if (nowFav && idx < 0) favs.push(m.mid);
         else if (!nowFav && idx >= 0) favs.splice(idx, 1);
-        if (uiModule && uiModule.showToast) uiModule.showToast(nowFav ? 'Favorited' : 'Unfavorited');
+        if (uiModule && uiModule.showToast) uiModule.showToast(nowFav ? t('modelPicker.favorited') : t('modelPicker.unfavorited'));
         // In browse mode the Favorites section membership changed — rebuild
         // (cheap: Recent + Favorites). In search mode the row stays put, so
         // the in-place favorite update above is enough.
@@ -540,7 +541,7 @@ function _initModelPickerDropdown() {
       _deps.setPendingChat({ url: m.url, modelId: m.mid, endpointId: m.endpointId });
       // Header stays as session name — model switch only updates picker
       updateModelPicker();
-      uiModule.showToast(`Using ${m.display}`);
+      uiModule.showToast(t('modelPicker.using', { model: m.display }));
       return;
     } else if (!currentSessionId) {
       // No session yet — create one with this model
@@ -554,7 +555,7 @@ function _initModelPickerDropdown() {
       try {
         const res = await fetch(`${API_BASE}/api/session/${currentSessionId}`, { method: 'PATCH', body: fd });
         if (!res.ok) {
-          uiModule.showError('Failed to set model');
+          uiModule.showError(t('modelPicker.setFailed'));
           return;
         }
         const sessions = _deps.getSessions();
@@ -562,13 +563,13 @@ function _initModelPickerDropdown() {
         if (s) { s.model = m.mid; s.endpoint_url = m.url; }
         // Header stays as session name — model info shown in picker only
       } catch (e) {
-        uiModule.showError('Failed to set model: ' + e);
+        uiModule.showError(t('modelPicker.setError', { error: e }));
         return;
       }
     }
     // Update picker visibility — model is now set
     updateModelPicker();
-    uiModule.showToast(`Using ${m.display}`);
+    uiModule.showToast(t('modelPicker.using', { model: m.display }));
   }
 
   document.addEventListener('ulises:auto-select-model', async (e) => {
@@ -659,7 +660,7 @@ function _initModelPickerDropdown() {
         if (!menu.classList.contains('hidden')) _populate(search.value || '');
         updateModelPicker();
       } catch (_) {
-        uiModule.showToast('Model refresh failed');
+        uiModule.showToast(t('modelPicker.refreshFailed'));
       } finally {
         refreshBtn.disabled = false;
         refreshBtn.classList.remove('spinning');

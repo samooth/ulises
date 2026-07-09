@@ -79,7 +79,7 @@ class PresetInfo:
 class PreprocessedMessage:
     """Result of chat_handler.preprocess_message."""
     enhanced_message: str
-    user_content: Any  # str or list (multimodal)
+    user_content: str | list  # str or list (multimodal)
     text_for_context: str
     youtube_transcripts: list
     attachment_meta: list

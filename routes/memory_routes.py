@@ -8,6 +8,7 @@ import tempfile
 import time
 from datetime import datetime
 import logging
+from core.translations import t
 
 # Leading list-marker like "1.", "12)", or "3:" plus surrounding whitespace.
 # Strips one prefix per call so import-from-LLM-output doesn't leave the
@@ -52,7 +53,7 @@ def setup_memory_routes(memory_manager: MemoryManager, session_manager: SessionM
         session title. Mirrors session_routes / webhook_routes ownership.
         """
         if user is not None and getattr(session_obj, "owner", None) != user:
-            raise HTTPException(404, "Session not found")
+            raise HTTPException(404, t("memory.session_not_found"))
 
     def _verify_memory_owner(memory: dict, user: Optional[str]):
         """Raise 404 if user doesn't own this memory.
@@ -64,7 +65,7 @@ def setup_memory_routes(memory_manager: MemoryManager, session_manager: SessionM
         if user is None:
             return  # Auth disabled
         if memory.get("owner") != user:
-            raise HTTPException(404, "Memory not found")
+            raise HTTPException(404, t("memory.not_found"))
 
     @router.post("/debug")
     def debug_memory_relevance(request: Request, query: str = Form(...)):
@@ -101,16 +102,16 @@ def setup_memory_routes(memory_manager: MemoryManager, session_manager: SessionM
         user = _owner(request)
         text = (memory_data.text or "").strip()
         if not text:
-            raise HTTPException(400, "empty memory")
+            raise HTTPException(400, t("memory.empty_memory"))
         user_mem = memory_manager.load(owner=user)
         if memory_manager.find_duplicates(text, user_mem):
-            return {"ok": True, "count": len(user_mem), "message": "Memory already exists"}
+            return {"ok": True, "count": len(user_mem), "message": t("memory.already_exists")}
 
         if memory_data.session_id:
             try:
                 session_obj = session_manager.get_session(memory_data.session_id)
             except KeyError:
-                raise HTTPException(404, "Session not found")
+                raise HTTPException(404, t("memory.session_not_found"))
             _assert_session_owner(session_obj, user)
 
         new_entry = memory_manager.add_entry(text, memory_data.source, memory_data.category, owner=user)
@@ -165,9 +166,9 @@ def setup_memory_routes(memory_manager: MemoryManager, session_manager: SessionM
                     dt = datetime.fromtimestamp(memory["timestamp"])
                     memory["timestamp_str"] = dt.strftime("%Y-%m-%d %H:%M:%S")
                 except (ValueError, OSError, OverflowError):
-                    memory["timestamp_str"] = "Unknown"
+                    memory["timestamp_str"] = t("memory.unknown")
             else:
-                memory["timestamp_str"] = "Unknown"
+                memory["timestamp_str"] = t("memory.unknown")
 
             session_id = memory.get("session_id")
             if session_id and session_id in session_manager.sessions:
@@ -175,15 +176,15 @@ def setup_memory_routes(memory_manager: MemoryManager, session_manager: SessionM
                     session = session_manager.get_session(session_id)
                     if session:
                         _assert_session_owner(session, user)
-                    memory["session_name"] = session.name if session else f"Session {session_id[:6]}"
+                    memory["session_name"] = session.name if session else t("memory.session_prefix").format(id=session_id[:6])
                 except KeyError:
-                    memory["session_name"] = "Unknown"
+                    memory["session_name"] = t("memory.unknown")
                 except HTTPException as exc:
                     if exc.status_code != 404:
                         raise
-                    memory["session_name"] = "Unknown"
+                    memory["session_name"] = t("memory.unknown")
             else:
-                memory["session_name"] = "Unknown"
+                memory["session_name"] = t("memory.unknown")
 
             results.append(memory)
 
@@ -196,7 +197,7 @@ def setup_memory_routes(memory_manager: MemoryManager, session_manager: SessionM
         try:
             _session_obj = session_manager.get_session(session_id)
         except KeyError:
-            raise HTTPException(404, f"Session {session_id} not found")
+            raise HTTPException(404, t("memory.session_not_found_with_id").format(id=session_id))
         _assert_session_owner(_session_obj, user)
         memories = memory_manager.load(owner=user)
         session_memories = [m for m in memories if m.get("session_id") == session_id]
@@ -205,9 +206,9 @@ def setup_memory_routes(memory_manager: MemoryManager, session_manager: SessionM
 
         try:
             session = session_manager.get_session(session_id)
-            session_name = session.name if session else f"Session {session_id[:6]}"
+            session_name = session.name if session else t("memory.session_prefix").format(id=session_id[:6])
         except KeyError:
-            session_name = f"Session {session_id[:6]}"
+            session_name = t("memory.session_prefix").format(id=session_id[:6])
 
         for memory in session_memories:
             memory["session_name"] = session_name
@@ -226,7 +227,7 @@ def setup_memory_routes(memory_manager: MemoryManager, session_manager: SessionM
         try:
             sess = session_manager.get_session(session)
         except KeyError:
-            raise HTTPException(404, "Session not found")
+            raise HTTPException(404, t("memory.session_not_found"))
         _assert_session_owner(sess, _owner(request))
 
         system_msg = {
@@ -295,7 +296,7 @@ def setup_memory_routes(memory_manager: MemoryManager, session_manager: SessionM
         )
 
         if not endpoint_url or not model:
-            raise HTTPException(400, "No default model configured — set one in Settings")
+            raise HTTPException(400, t("memory.no_default_model"))
 
         result = await audit_memories(
             memory_manager,
@@ -307,7 +308,7 @@ def setup_memory_routes(memory_manager: MemoryManager, session_manager: SessionM
         )
 
         if "error" in result and "before" not in result:
-            raise HTTPException(502, f"Audit failed: {result['error']}")
+            raise HTTPException(502, t("memory.audit_failed").format(error=result['error']))
 
         return {
             "ok": "error" not in result,
@@ -358,7 +359,7 @@ def setup_memory_routes(memory_manager: MemoryManager, session_manager: SessionM
             endpoint_url, model, headers = resolve_task_endpoint(owner=user)
     
         if not endpoint_url or not model:
-            raise HTTPException(400, "No LLM model configured. Set a default model in Settings.")
+            raise HTTPException(400, t("memory.no_llm_model"))
 
         content = await read_upload_limited(file, MEMORY_IMPORT_MAX_BYTES, "Memory import")
         filename = file.filename or "upload"
@@ -366,7 +367,7 @@ def setup_memory_routes(memory_manager: MemoryManager, session_manager: SessionM
 
         allowed = {".txt", ".md", ".pdf", ".csv", ".log", ".json", ".py", ".js", ".html"}
         if ext not in allowed:
-            raise HTTPException(400, f"Unsupported file type: {ext}")
+            raise HTTPException(400, t("memory.unsupported_file_type").format(ext=ext))
 
         # Extract text based on file type
         if ext == ".pdf":
@@ -387,7 +388,7 @@ def setup_memory_routes(memory_manager: MemoryManager, session_manager: SessionM
                 text = content.decode(encoding, errors="replace")
 
         if not text.strip():
-            return {"suggestions": [], "message": "No readable content found"}
+            return {"suggestions": [], "message": t("memory.no_readable_content")}
 
         # Fast path: a .json upload that already looks like a memories export
         # (list of {text, category, ...} dicts, or list of strings) round-trips
@@ -481,7 +482,7 @@ def setup_memory_routes(memory_manager: MemoryManager, session_manager: SessionM
             return {"suggestions": [{"text": l, "category": "fact"} for l in lines[:20]], "filename": filename}
         except Exception as e:
             logger.error(f"Memory import extraction failed: {e}")
-            raise HTTPException(502, f"LLM extraction failed: {str(e)}")
+            raise HTTPException(502, t("memory.llm_extraction_failed").format(error=str(e)))
 
     @router.post("/{memory_id}/pin")
     def pin_memory(request: Request, memory_id: str, pinned: bool = Form(True)):
@@ -494,7 +495,7 @@ def setup_memory_routes(memory_manager: MemoryManager, session_manager: SessionM
                 all_mem[i]["pinned"] = pinned
                 memory_manager.save(all_mem)
                 return {"ok": True, "pinned": pinned}
-        raise HTTPException(404, f"Memory item {memory_id} not found")
+        raise HTTPException(404, t("memory.item_not_found").format(id=memory_id))
 
     # Wildcard routes MUST come last — otherwise they swallow /import, /search, etc.
     @router.get("/{memory_id}")
@@ -506,7 +507,7 @@ def setup_memory_routes(memory_manager: MemoryManager, session_manager: SessionM
             if memory["id"] == memory_id:
                 return {"memory": memory}
 
-        raise HTTPException(404, "Memory not found")
+        raise HTTPException(404, t("memory.not_found"))
 
     @router.put("/{memory_id}")
     def update_memory(request: Request, memory_id: str, text: str = Form(...), category: str = Form(None)):
@@ -526,9 +527,9 @@ def setup_memory_routes(memory_manager: MemoryManager, session_manager: SessionM
                 if memory_vector and memory_vector.healthy:
                     memory_vector.remove(memory_id)
                     memory_vector.add(memory_id, text.strip())
-                return {"ok": True, "message": "Memory updated successfully"}
+                return {"ok": True, "message": t("memory.update_success")}
 
-        raise HTTPException(404, f"Memory item {memory_id} not found")
+        raise HTTPException(404, t("memory.item_not_found").format(id=memory_id))
 
     @router.delete("/{memory_id}")
     def delete_memory(request: Request, memory_id: str):
@@ -539,7 +540,7 @@ def setup_memory_routes(memory_manager: MemoryManager, session_manager: SessionM
         # Find and verify ownership before deleting
         target = next((m for m in all_mem if m["id"] == memory_id), None)
         if not target:
-            raise HTTPException(404, f"Memory item {memory_id} not found")
+            raise HTTPException(404, t("memory.item_not_found").format(id=memory_id))
         _verify_memory_owner(target, user)
 
         all_mem = [m for m in all_mem if m["id"] != memory_id]
@@ -547,6 +548,6 @@ def setup_memory_routes(memory_manager: MemoryManager, session_manager: SessionM
         # Sync vector index
         if memory_vector and memory_vector.healthy:
             memory_vector.remove(memory_id)
-        return {"ok": True, "message": "Memory deleted successfully"}
+        return {"ok": True, "message": t("memory.delete_success")}
 
     return router

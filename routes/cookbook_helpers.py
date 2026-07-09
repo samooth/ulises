@@ -15,6 +15,7 @@ from pydantic import BaseModel
 
 from routes._validators import validate_remote_host, validate_ssh_port
 from core.platform_compat import _ssh_exec_argv
+from core.translations import t
 
 logger = logging.getLogger(__name__)
 
@@ -64,23 +65,23 @@ def _git_bash_path(path: str) -> str:
 
 def _validate_repo_id(v: str | None) -> str:
     if not v or not _REPO_ID_RE.match(v):
-        raise HTTPException(400, "Invalid repo_id — must be <org>/<name> using [A-Za-z0-9._-]")
+        raise HTTPException(400, t("cookbook.invalid_repo_id_format"))
     return v
 
 
 def _validate_serve_model_id(v: str | None) -> str:
     if not v:
-        raise HTTPException(400, "repo_id is required")
+        raise HTTPException(400, t("cookbook.repo_id_required"))
     if _REPO_ID_RE.match(v) or _LOCAL_MODEL_ID_RE.match(v) or _OLLAMA_MODEL_ID_RE.match(v):
         return v
-    raise HTTPException(400, "Invalid repo_id — must be <org>/<name>, an Ollama name:tag, or a cached local model id")
+    raise HTTPException(400, t("cookbook.invalid_repo_id_or_model"))
 
 
 def _validate_include(v: str | None) -> str | None:
     if v is None or v == "":
         return None
     if not _INCLUDE_RE.match(v):
-        raise HTTPException(400, "Invalid include pattern")
+        raise HTTPException(400, t("cookbook.invalid_include_pattern"))
     return v
 
 
@@ -88,7 +89,7 @@ def _validate_token(v: str | None) -> str | None:
     if v is None or v == "":
         return None
     if not _TOKEN_RE.match(v):
-        raise HTTPException(400, "Invalid token characters")
+        raise HTTPException(400, t("cookbook.invalid_token_characters"))
     return v
 
 
@@ -117,7 +118,7 @@ def _validate_local_dir(v: str | None) -> str | None:
         v = v[1:-1]
     v = v.rstrip("/") or "/"
     if not (_LOCAL_DIR_RE.match(v) or _WINDOWS_LOCAL_DIR_RE.match(v)):
-        raise HTTPException(400, "Invalid local_dir — must be an absolute or ~ path with no shell metacharacters")
+        raise HTTPException(400, t("cookbook.invalid_local_dir_path"))
     # Reject path segments that start with '-' (option injection). '-' is in the
     # allowlist, so a dir like ``/models/-rf`` or ``D:\models\-rf`` could be read
     # as a CLI flag by hf/etc. — and quoting does NOT stop a value from being
@@ -125,7 +126,7 @@ def _validate_local_dir(v: str | None) -> str | None:
     # quoting can't cover, so the guard lives here, keeping the safety wholly
     # inside the validator rather than relying on consumers.
     if any(seg.startswith("-") for seg in re.split(r"[\\/]", v) if seg):
-        raise HTTPException(400, "Invalid local_dir — path segments cannot start with '-'")
+        raise HTTPException(400, t("cookbook.invalid_local_dir_segment"))
     return v
 
 
@@ -133,7 +134,7 @@ def _validate_gpus(v: str | None) -> str | None:
     if v is None or v == "":
         return None
     if not _GPU_LIST_RE.fullmatch(str(v)):
-        raise HTTPException(400, "Invalid gpus — expected comma-separated GPU indexes")
+        raise HTTPException(400, t("cookbook.invalid_gpus"))
     return str(v)
 
 
@@ -663,7 +664,7 @@ def _check_serve_binary(seg: str) -> None:
     try:
         tokens = shlex.split(seg) if seg.strip() else []
     except ValueError:
-        raise HTTPException(400, "Invalid cmd — could not parse")
+        raise HTTPException(400, t("cookbook.invalid_cmd_parse"))
     if not tokens:
         return
     env_re = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*=")
@@ -672,8 +673,7 @@ def _check_serve_binary(seg: str) -> None:
     if base not in _SERVE_CMD_ALLOWLIST:
         raise HTTPException(
             400,
-            f"cmd binary '{base or '(empty)'}' is not allowed. Must start with one of: "
-            f"{', '.join(sorted(_SERVE_CMD_ALLOWLIST))}",
+            t("cookbook.invalid_cmd_binary").format(base=base or "(empty)", allowlist=", ".join(sorted(_SERVE_CMD_ALLOWLIST))),
         )
 
 
@@ -697,7 +697,7 @@ def _validate_serve_cmd(v: str | None) -> str | None:
     v = re.sub(r"\\[ \t]*\r?\n[ \t]*", " ", v).strip()
     # Backticks and raw newlines are never legitimate here.
     if any(c in v for c in ("`", "\n", "\r")):
-        raise HTTPException(400, "Invalid characters in cmd")
+        raise HTTPException(400, t("cookbook.invalid_chars_cmd"))
 
     # Known GGUF launcher prelude → validate the serve invocation(s) it guards.
     m = _GGUF_PRELUDE_RE.match(v)
@@ -720,7 +720,7 @@ def _validate_serve_cmd(v: str | None) -> str | None:
 
     # (`$(` was the original intent; bare `$` is fine for shell-safe paths.)
     if any(c in cleaned_v for c in (";", "&&", "||", "$(")):
-        raise HTTPException(400, "Invalid characters in cmd")
+        raise HTTPException(400, t("cookbook.invalid_chars_cmd"))
     _check_serve_binary(v)
     return v
 
@@ -1100,7 +1100,7 @@ def _safe_env_prefix(ep: str | None) -> str | None:
     try:
         parts = shlex.split(ep, posix=True)
     except ValueError:
-        raise HTTPException(400, "Invalid env_prefix")
+        raise HTTPException(400, t("cookbook.invalid_env_prefix"))
     if len(parts) != 2 or parts[0] not in {"source", "."}:
         # Bash conda activation emitted by the frontend:
         #   eval "$(conda shell.bash hook)" && conda activate ENV
@@ -1110,9 +1110,9 @@ def _safe_env_prefix(ep: str | None) -> str | None:
             try:
                 env_parts = shlex.split(env, posix=True)
             except ValueError:
-                raise HTTPException(400, "Invalid env_prefix")
+                raise HTTPException(400, t("cookbook.invalid_env_prefix"))
             if len(env_parts) != 1:
-                raise HTTPException(400, "Invalid env_prefix")
+                raise HTTPException(400, t("cookbook.invalid_env_prefix"))
             return 'eval "$(conda shell.bash hook)" && conda activate ' + shlex.quote(env_parts[0])
 
         # Plain conda activation, used by Windows/PowerShell and some manual callers.
@@ -1124,13 +1124,13 @@ def _safe_env_prefix(ep: str | None) -> str | None:
         if len(parts) == 2 and parts[0] == "&":
             path = parts[1]
             if any(c in path for c in "\r\n;&|`$<>"):
-                raise HTTPException(400, "Invalid env_prefix")
+                raise HTTPException(400, t("cookbook.invalid_env_prefix"))
             return "& '" + path.replace("'", "''") + "'"
 
-        raise HTTPException(400, "Invalid env_prefix")
+        raise HTTPException(400, t("cookbook.invalid_env_prefix"))
     path = parts[1]
     if any(c in path for c in "\r\n;&|`$<>"):
-        raise HTTPException(400, "Invalid env_prefix")
+        raise HTTPException(400, t("cookbook.invalid_env_prefix"))
     # Replace a leading "~/" with "$HOME/" so it survives quoting
     if path.startswith("~/"):
         path = "$HOME/" + path[2:]
@@ -1163,7 +1163,7 @@ def _diagnose_serve_output(text: str) -> dict | None:
     patterns = [
         (
             r"No available memory for the cache blocks|Available KV cache memory:.*-",
-            "No GPU memory left for KV cache after loading model.",
+            t("cookbook.diagnosis.no_gpu_memory"),
             [
                 {"label": "retry with GPU memory utilization 0.95", "op": "replace", "flag": "--gpu-memory-utilization", "value": "0.95"},
                 {"label": "retry with context 2048", "op": "replace", "flag": "--max-model-len", "value": "2048"},
@@ -1171,7 +1171,7 @@ def _diagnose_serve_output(text: str) -> dict | None:
         ),
         (
             r"CUDA out of memory|torch\.cuda\.OutOfMemoryError|CUDA error: out of memory|warming up sampler|max_num_seqs.*gpu_memory_utilization",
-            "GPU ran out of memory during startup or warmup.",
+            t("cookbook.diagnosis.gpu_oom"),
             [
                 {"label": "retry with context 4096", "op": "replace", "flag": "--max-model-len", "value": "4096"},
                 {"label": "retry with GPU memory utilization 0.80", "op": "replace", "flag": "--gpu-memory-utilization", "value": "0.80"},
@@ -1180,7 +1180,7 @@ def _diagnose_serve_output(text: str) -> dict | None:
         ),
         (
             r"not divisib|must be divisible|attention heads.*divisible",
-            "Tensor parallel size is incompatible with the model.",
+            t("cookbook.diagnosis.tp_incompatible"),
             [
                 {"label": "retry with tensor parallel size 1", "op": "replace", "flag": "--tensor-parallel-size", "value": "1"},
                 {"label": "retry with tensor parallel size 2", "op": "replace", "flag": "--tensor-parallel-size", "value": "2"},
@@ -1188,7 +1188,7 @@ def _diagnose_serve_output(text: str) -> dict | None:
         ),
         (
             r"KV cache.*too (small|large)|max_model_len.*exceeds|maximum.*context",
-            "Context length is too large for available GPU memory.",
+            t("cookbook.diagnosis.context_too_large"),
             [
                 {"label": "retry with context 8192", "op": "replace", "flag": "--max-model-len", "value": "8192"},
                 {"label": "retry with context 4096", "op": "replace", "flag": "--max-model-len", "value": "4096"},
@@ -1196,17 +1196,17 @@ def _diagnose_serve_output(text: str) -> dict | None:
         ),
         (
             r"enable-auto-tool-choice requires --tool-call-parser",
-            "Auto tool choice requires an explicit tool call parser.",
+            t("cookbook.diagnosis.auto_tool_choice"),
             [{"label": "retry with Hermes tool parser", "op": "append", "arg": "--tool-call-parser hermes"}],
         ),
         (
             r"Please pass.*trust.remote.code=True|contains custom code which must be executed to correctly load|does not recognize this architecture|model type.*but Transformers does not",
-            "Model requires custom code or newer model support.",
+            t("cookbook.diagnosis.custom_code_needed"),
             [{"label": "retry with --trust-remote-code", "op": "append", "arg": "--trust-remote-code"}],
         ),
         (
             r"There is no module or parameter named ['\"]lm_head\.input_scale['\"]|lm_head\.input_scale|weight_scale_2",
-            "vLLM cannot load this ModelOpt LM-head quantized checkpoint with the current runtime.",
+            t("cookbook.diagnosis.modelopt_quant"),
             [
                 {
                     "label": "upgrade vLLM through the environment that provides this CLI, or use a compatible checkpoint",
@@ -1216,23 +1216,22 @@ def _diagnose_serve_output(text: str) -> dict | None:
         ),
         (
             r"Either a revision or a version must be specified|transformers\.integrations\.hub_kernels|kernels/layer",
-            "vLLM/Transformers kernel package mismatch.",
+            t("cookbook.diagnosis.kernel_mismatch"),
             [{"label": "update vLLM, Transformers, and kernels on this server", "op": "dependency", "package": "vllm transformers kernels"}],
         ),
         (
             r"Address already in use|bind.*address.*in use",
-            "Port is already in use.",
+            t("cookbook.diagnosis.port_in_use"),
             [{"label": "retry on port 8001", "op": "replace", "flag": "--port", "value": "8001"}],
         ),
         (
             r"No CUDA GPUs are available|no GPU.*found|CUDA_VISIBLE_DEVICES.*invalid",
-            "No GPUs are visible to the serve process.",
+            t("cookbook.diagnosis.no_gpus_visible"),
             [{"label": "clear Cookbook GPU selection or choose available GPUs", "op": "settings", "field": "gpus", "value": ""}],
         ),
         (
             r"Failed to infer device type|NVML Shared Library Not Found|No module named 'amdsmi'|platform is not available",
-            "vLLM could not find a supported GPU (CUDA or ROCm). "
-            "This machine may have integrated or unsupported graphics only.",
+            t("cookbook.diagnosis.unsupported_gpu"),
             [
                 {"label": "switch to llama.cpp (CPU/Metal, works without a discrete GPU)", "op": "manual"},
                 {"label": "switch to Ollama (CPU/Metal, works without a discrete GPU)", "op": "manual"},
@@ -1240,14 +1239,14 @@ def _diagnose_serve_output(text: str) -> dict | None:
         ),
         (
             r"vllm.*command not found|No module named vllm|ERROR: vLLM is not installed",
-            "vLLM is not installed or not in PATH on this server.",
+            t("cookbook.diagnosis.vllm_not_installed"),
             [{"label": "install vLLM in Cookbook Dependencies", "op": "dependency", "package": "vllm"}],
         ),
         (
             r"sgl_kernel[\s\S]*(Python\.h|libnuma\.so\.1|common_ops)|"
             r"(Python\.h|libnuma\.so\.1|common_ops)[\s\S]*sgl_kernel|"
             r"Please ensure sgl_kernel is properly installed",
-            "SGLang native dependencies are missing on this server.",
+            t("cookbook.diagnosis.sglang_deps_missing"),
             [
                 {"label": "install OS packages: libnuma-dev python3.12-dev build-essential", "op": "manual"},
                 {"label": "upgrade sglang-kernel after OS packages are installed", "op": "manual"},
@@ -1255,7 +1254,7 @@ def _diagnose_serve_output(text: str) -> dict | None:
         ),
         (
             r"sglang.*command not found|No module named sglang|SGLang is not installed",
-            "SGLang is not installed or not in PATH on this server.",
+            t("cookbook.diagnosis.sglang_not_installed"),
             [{"label": "install SGLang in Cookbook Dependencies", "op": "dependency", "package": "sglang[all]"}],
         ),
         # System build deps come BEFORE the generic llama.cpp catch-all so
@@ -1264,37 +1263,37 @@ def _diagnose_serve_output(text: str) -> dict | None:
         # itself fails to compile when cmake is absent).
         (
             r"cmake: command not found|cmake.*not found.*[Cc]ould not",
-            "cmake is required to build llama.cpp from source but isn't installed on this server.",
+            t("cookbook.diagnosis.cmake_missing"),
             [{"label": "install build deps for llama.cpp (apt: cmake build-essential git / pacman: cmake base-devel git / dnf: cmake gcc-c++ make git / brew: cmake git)", "op": "dependency", "package": "llama-cpp-python[server]"}],
         ),
         (
             r"^(make|g\+\+|gcc): command not found|Could not find C\+\+ compiler",
-            "A C/C++ compiler (build-essential) is required to build llama.cpp from source.",
+            t("cookbook.diagnosis.compiler_missing"),
             [{"label": "install build deps for llama.cpp on this server", "op": "dependency", "package": "llama-cpp-python[server]"}],
         ),
         (
             r"^git: command not found",
-            "git is required to clone the llama.cpp source tree.",
+            t("cookbook.diagnosis.git_missing"),
             [{"label": "install build deps for llama.cpp on this server", "op": "dependency", "package": "llama-cpp-python[server]"}],
         ),
         (
             r"llama-server.*command not found|llama\.cpp.*not found|No module named.*llama_cpp|No module named 'starlette_context'",
-            "llama.cpp / llama-cpp-python dependencies are missing.",
+            t("cookbook.diagnosis.llamacpp_deps_missing"),
             [{"label": "install llama.cpp dependencies or llama-cpp-python[server]", "op": "dependency", "package": "llama-cpp-python[server]"}],
         ),
         (
             r"No GGUF found on this host|no \.gguf file|No GGUF file found",
-            "No GGUF file found for this model on this host. The llama.cpp backend needs a .gguf file.",
+            t("cookbook.diagnosis.no_gguf_found"),
             [{"label": "download a GGUF build of this model (repo name usually ends in -GGUF, file like Q4_K_M.gguf)", "op": "manual"}],
         ),
         (
             r"No module named 'torch'|No module named torch|No module named 'diffusers'|No module named diffusers",
-            "Diffusion serving requires PyTorch and diffusers.",
+            t("cookbook.diagnosis.diffusion_deps_missing"),
             [{"label": "install diffusers[torch] in Cookbook Dependencies", "op": "dependency", "package": "diffusers[torch]"}],
         ),
         (
             r"403 Forbidden|401 Unauthorized|Access to model.*is restricted|gated repo|not in the authorized list|awaiting a review",
-            "Model access is gated or unauthorized.",
+            t("cookbook.diagnosis.model_access_denied"),
             [{"label": "set HF token and request model access on HuggingFace", "op": "manual"}],
         ),
     ]
@@ -1305,7 +1304,7 @@ def _diagnose_serve_output(text: str) -> dict | None:
         r"Application startup complete|GET /v1/|Uvicorn running on", tail, re.I
     ):
         return {
-            "message": "Python traceback detected during serve startup.",
+            "message":             t("cookbook.diagnosis.traceback_detected"),
             "suggestions": [{"label": "inspect traceback and retry with adjusted backend/settings", "op": "manual"}],
         }
     return None

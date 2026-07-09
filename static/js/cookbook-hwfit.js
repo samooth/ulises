@@ -33,6 +33,7 @@ import uiModule from './ui.js';
 import spinnerModule from './spinner.js';
 import { _loadTasks, _tmuxGracefulKill } from './cookbookRunning.js';
 import { openCookbookDependencies } from './cookbook-diagnosis.js';
+import { t } from './i18n.js';
 
 // Map a serve-backend code (vllm / sglang / llamacpp) → the package name
 // the Dependencies API reports. Used to look up "is this backend installed
@@ -62,10 +63,7 @@ async function _ensureBackendInstalled(runBackend, host, port, envPath, modelNam
     return true;
   }
   const targetLabel = host || 'this server';
-  uiModule.showToast(
-    `${pkgName} not installed on ${targetLabel}. Opening Dependencies — pick your model and click Run.`,
-    6000
-  );
+  uiModule.showToast(t('cookbook.backendNotInstalled', { pkg: pkgName, host: targetLabel }), 6000);
   openCookbookDependencies(pkgName, { expandRecipe: pkgName, model: modelName });
   return false;
 }
@@ -1485,7 +1483,7 @@ export function _expandModelRow(row, modelData) {
         || [..._cachedModelIds].some(id => id === modelData.name || id.endsWith('/' + _short))
       );
       if (_cachedModelIds && !_downloaded) {
-        uiModule.showToast('Model not downloaded yet — starting download. Run again to serve once it finishes.');
+        uiModule.showToast(t('cookbook.modelNotDownloaded'));
         if (backend === 'ollama') {
           _runPanelCmd(panel, _buildDownloadCmd(modelData, backend), { timeout: 0 });
         } else {
@@ -1509,8 +1507,8 @@ export function _expandModelRow(row, modelData) {
         if (_activeServes.length) {
           const _names = _activeServes.map(t => t.payload?.repo_id || t.repo || t.name || '?').filter(Boolean);
           const _ok = await window.styledConfirm?.(
-            `${_names.length} model${_names.length === 1 ? '' : 's'} already serving on ${_qrHostStr || 'local'} (${_names.join(', ')}). Port 8000 will collide. Stop the running model and launch this one?`,
-            { confirmText: 'Stop & launch', cancelText: 'Cancel' }
+            t('cookbook.confirmStopAndLaunch', { count: _names.length, host: _qrHostStr || 'local', names: _names.join(', ') }),
+            { confirmText: t('cookbook.stopAndLaunch'), cancelText: t('cookbook.cancel') }
           );
           if (!_ok) return;
           // Mark + kill each running serve, then wait briefly for the
@@ -1555,11 +1553,11 @@ export function _expandModelRow(row, modelData) {
       if (_qrRunBackend === 'vllm' || _qrRunBackend === 'sglang') {
         const _sys = _hwfitCache?.system || {};
         if (_sys.gpu_error) {
-          uiModule.showError(`Can't launch: GPU driver error — ${_sys.gpu_error}. Reinstall or repair the NVIDIA driver, then re-scan.`);
+          uiModule.showError(t('cookbook.gpuDriverError', { error: _sys.gpu_error }));
           return;
         }
         if (!_sys.has_gpu || !(_sys.gpu_count > 0)) {
-          uiModule.showError(`Can't launch: no GPU detected by nvidia-smi. ${_qrRunBackend === 'vllm' ? 'vLLM' : 'SGLang'} needs a working CUDA or ROCm device.`);
+          uiModule.showError(t('cookbook.noGpuDetected', { backend: _qrRunBackend === 'vllm' ? 'vLLM' : 'SGLang' }));
           return;
         }
       }
@@ -1598,7 +1596,7 @@ export function _expandModelRow(row, modelData) {
               const _hint = _qrRunBackend === 'vllm'
                 ? 'uv pip install -U vllm --torch-backend auto'
                 : "pip install -U 'sglang[all]'";
-              uiModule.showError(`Can't launch: ${_pkg} isn't installed${_qrHostStr ? ' on ' + _qrHostStr : ''}. Install it first:\n${_hint}`);
+              uiModule.showError(t('cookbook.backendNotInstalledLaunch', { pkg: _pkg, host: _qrHostStr, hint: _hint }));
               return;
             }
             // Version-floor check. _minBackendVersion returns null when this
@@ -1612,7 +1610,7 @@ export function _expandModelRow(row, modelData) {
               const _hint = _qrRunBackend === 'vllm'
                 ? 'uv pip install -U vllm --torch-backend auto'
                 : "pip install -U 'sglang[all]'";
-              uiModule.showError(`Can't launch: ${modelData.name} needs ${_pkg} ≥ ${_minVer}, but ${_curVer} is installed${_qrHostStr ? ' on ' + _qrHostStr : ''}. Upgrade:\n${_hint}`);
+              uiModule.showError(t('cookbook.backendVersionTooOld', { model: modelData.name, pkg: _pkg, minVer: _minVer, curVer: _curVer, host: _qrHostStr, hint: _hint }));
               return;
             }
           }
@@ -1737,15 +1735,15 @@ export function _expandModelRow(row, modelData) {
           const shortName = modelData.name.split('/').pop();
           _addTask(data.session_id, shortName, 'serve', { _cmd: cmd, model: modelData.name, backend: runBackend, remote_host: host });
           _renderRunningTab();
-          uiModule.showToast(`Launching ${shortName}...`);
+          uiModule.showToast(t('cookbook.launching', { name: shortName }));
           // Switch to Running tab
           const runTab = document.querySelector('.cookbook-tab[data-backend="Running"]');
           if (runTab) runTab.click();
         } else {
-          uiModule.showError('Launch failed: ' + (data.error || ''));
+          uiModule.showError(t('cookbook.launchFailed', { error: data.error || '' }));
         }
       } catch (e) {
-        uiModule.showError('Launch failed: ' + e.message);
+        uiModule.showError(t('cookbook.launchError', { message: e.message }));
       }
       quickRunBtn.disabled = false;
       quickRunBtn.textContent = 'Run';
@@ -1767,7 +1765,7 @@ export function _expandModelRow(row, modelData) {
         || [..._cachedModelIds].some(id => id === repo || id.endsWith('/' + short))
       );
       if (_cachedModelIds && !downloaded) {
-        uiModule.showToast('Download the model first, then configure from Serve tab');
+        uiModule.showToast(t('cookbook.downloadFirst'));
         return;
       }
       // Downloaded (or cache state unknown) — open the Serve panel, which switches
@@ -1776,7 +1774,7 @@ export function _expandModelRow(row, modelData) {
         const { openServePanelForRepo } = await import('./cookbookServe.js');
         await openServePanelForRepo(repo);
       } catch (e) {
-        uiModule.showToast('Could not open Serve: ' + (e && e.message ? e.message : e));
+        uiModule.showToast(t('cookbook.openServeFailed', { error: e && e.message ? e.message : e }));
       }
     });
   }
@@ -2116,8 +2114,8 @@ export function _hwfitInit() {
         }
         const defaultSrv = _serverByVal(_envState.defaultServer);
         uiModule.showToast(_envState.defaultServer
-          ? 'Default server: ' + (_envState.defaultServer === 'local' ? 'Local' : (defaultSrv?.name || defaultSrv?.host || 'selected server'))
-          : 'Default server cleared');
+          ? t('cookbook.defaultServerSet', { server: _envState.defaultServer === 'local' ? 'Local' : (defaultSrv?.name || defaultSrv?.host || 'selected server') })
+          : t('cookbook.defaultServerCleared'));
       });
     }
     const keyBtn = entry.querySelector('.cookbook-server-key-btn');
@@ -2144,7 +2142,7 @@ export function _hwfitInit() {
         const cmd = entry.querySelector('.cookbook-server-key-command')?.value?.trim() || '';
         if (!cmd || cmd.startsWith('Enter ')) return;
         await _copyText(cmd);
-        uiModule.showToast('SSH setup command copied');
+        uiModule.showToast(t('cookbook.sshCommandCopied'));
       });
     }
     entry.querySelectorAll('input, select').forEach(el => {
@@ -2211,9 +2209,9 @@ export function _hwfitInit() {
                 || 'this server';
       let ok = true;
       if (uiModule && uiModule.styledConfirm) {
-        ok = await uiModule.styledConfirm(`Remove "${name}"?`, { confirmText: 'Remove', danger: true });
+        ok = await uiModule.styledConfirm(t('cookbook.removeServer', { name }), { confirmText: t('cookbook.remove'), danger: true });
       } else {
-        ok = confirm(`Remove "${name}"?`);
+        ok = confirm(t('cookbook.removeServer', { name }));
       }
       if (!ok) return;
       entry.remove();
@@ -2249,7 +2247,7 @@ export function _hwfitInit() {
           if (data.ok) {
             setupBtn.textContent = '\u2713 Done';
             setupBtn.style.color = '#50fa7b';
-            uiModule.showToast(`Setup complete (${data.platform})`);
+            uiModule.showToast(t('cookbook.setupComplete', { platform: data.platform }));
             // Store detected platform on the server entry
             if (data.platform) {
               entry.dataset.platform = data.platform;
@@ -2285,12 +2283,12 @@ export function _hwfitInit() {
           } else {
             setupBtn.textContent = 'Failed';
             setupBtn.style.color = 'var(--red)';
-            uiModule.showError(data.error || data.output || 'Setup failed');
+            uiModule.showError(t('cookbook.setupFailed', { error: data.error || data.output || 'Setup failed' }));
           }
         } catch (e) {
           setupBtn.textContent = 'Error';
           setupBtn.style.color = 'var(--red)';
-          uiModule.showError(e.message);
+          uiModule.showError(t('cookbook.setupError', { message: e.message }));
         }
         setTimeout(() => { setupBtn.disabled = false; setupBtn.textContent = origText; setupBtn.style.color = ''; }, 3000);
       });
@@ -2347,7 +2345,7 @@ export function _hwfitInit() {
       tag.classList.add('cookbook-modeldir-target');
       dlEl.title = 'Downloads go here';
       _syncServers();
-      uiModule.showToast((dlEl.dataset.dlDir ? 'Downloads \u2192 ' + dlEl.dataset.dlDir : 'Downloads \u2192 default HF cache'));
+      uiModule.showToast(dlEl.dataset.dlDir ? t('cookbook.downloadsToDir', { dir: dlEl.dataset.dlDir }) : t('cookbook.downloadsToDefault'));
     });
   }
 

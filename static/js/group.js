@@ -9,6 +9,7 @@ import { providerLogo } from './providers.js';
 import { PROMPT_TEMPLATES, getAllPresets } from './presets.js';
 import { sortModelObjects } from './modelSort.js';
 import Storage from './storage.js';
+import { t } from './i18n.js';
 
 let API_BASE = '';
 let _active = false;
@@ -102,7 +103,7 @@ function _initGroupTab() {
     // Auto-add when model is selected
     modelSel.addEventListener('change', () => {
       if (!modelSel.value) return;
-      if (_groupParticipants.length >= 8) { uiModule.showToast('Max 8'); return; }
+      if (_groupParticipants.length >= 8) { uiModule.showToast(t('group.max8')); return; }
       const entry = { character: null, model: null };
       entry.model = models.find(m => m.mid === modelSel.value) || null;
       if (charSel.value) entry.character = characters.find(c => c.id === charSel.value) || null;
@@ -149,7 +150,7 @@ function _initGroupTab() {
       return m;
     }).filter(Boolean);
 
-    if (picked.length < 2) { uiModule.showToast('Need at least 2 participants — add models or characters'); return; }
+    if (picked.length < 2) { uiModule.showToast(t('group.need_at_least_2')); return; }
 
     const modal = document.getElementById('custom-preset-modal');
     if (modal) modal.classList.add('hidden');
@@ -192,7 +193,7 @@ function _initGroupTab() {
       } catch (e) {}
     }
 
-    uiModule.showToast('Group chat ready — ' + picked.length + ' participants');
+    uiModule.showToast(t('group.ready', { count: picked.length }));
   });
 
   const groupTab = document.querySelector('.preset-tab[data-chartab="group"]');
@@ -260,7 +261,7 @@ function _initGroupTab() {
         // Long-press / right-click to delete
         chip.addEventListener('contextmenu', async (e) => {
           e.preventDefault();
-          if (await window.styledConfirm('Delete preset "' + (g.name || 'Group') + '"?', { confirmText: 'Delete', danger: true })) {
+          if (await window.styledConfirm(t('group.delete_preset', { name: g.name || 'Group' }), { confirmText: t('group.delete'), danger: true })) {
             groups.splice(idx, 1);
             fetch(API_BASE + '/api/presets/groups', {
               method: 'POST', credentials: 'same-origin',
@@ -440,7 +441,7 @@ export async function showModelPicker() {
         });
         row.querySelector('input').addEventListener('change', (e) => {
           if (e.target.checked) {
-            if (selected.size >= 8) { e.target.checked = false; uiModule.showToast('Max 8 models'); return; }
+            if (selected.size >= 8) { e.target.checked = false; uiModule.showToast(t('group.max8_models')); return; }
             selected.add(m.mid);
           } else {
             selected.delete(m.mid);

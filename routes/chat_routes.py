@@ -11,6 +11,7 @@ from typing import Dict, Any, AsyncGenerator, List, Optional
 from fastapi import APIRouter, Request, HTTPException, Form, Query
 from fastapi.responses import StreamingResponse
 from pydantic import ValidationError
+from core.translations import t
 
 from core.models import ChatMessage
 from src.request_models import ChatRequest
@@ -362,20 +363,17 @@ def setup_chat_routes(
         try:
             sess = session_manager.get_session(session)
         except KeyError:
-            raise HTTPException(404, f"Session '{session}' not found")
+            raise HTTPException(404, t("chat.session_not_found").format(name=session))
         owner = effective_user(request)
         if _clear_orphaned_session_endpoint(sess, owner=owner):
-            raise HTTPException(400, "Selected model endpoint was removed. Pick another model in Settings.")
+            raise HTTPException(400, t("chat.model_removed"))
 
         # Empty model + live endpoint = setup race (Issue #587). Repair from
         # the endpoint's cached model list before privilege checks, which
         # otherwise see "" and behave inconsistently with the allowlist.
         _recover_empty_session_model(sess, session, owner=owner)
         if not getattr(sess, "model", "").strip():
-            raise HTTPException(
-                400,
-                "No model selected for this chat. Open the model picker and choose one before sending.",
-            )
+            raise HTTPException(400, t("chat.no_model_selected"))
 
         # Same allowed_models + daily-cap gate as chat_stream (mirror so the
         # non-streaming path can't be used to bypass).
@@ -461,11 +459,11 @@ def setup_chat_routes(
                 try:
                     body = await request.json()
                 except json.JSONDecodeError as e:
-                    raise HTTPException(400, f"Invalid JSON: {e}")
+                    raise HTTPException(400, t("chat.invalid_json").format(error=e))
         except HTTPException:
             raise
         except Exception as e:
-            raise HTTPException(400, f"Request parsing error: {e}")
+            raise HTTPException(400, t("chat.request_parsing_error").format(error=e))
 
         _set_user_time_from_request(request)
 
@@ -605,7 +603,7 @@ def setup_chat_routes(
             sess = session_manager.get_session(session)
             owner = effective_user(request)
             if _clear_orphaned_session_endpoint(sess, owner=owner):
-                raise HTTPException(400, "Selected model endpoint was removed. Pick another model in Settings.")
+                raise HTTPException(400, t("chat.model_removed"))
             # Issue #587: picker shows a model from the endpoint cache but
             # s.model never made it onto the DB row (first-send race after
             # endpoint setup, or a previous endpoint delete/recreate). Pull
@@ -614,14 +612,11 @@ def setup_chat_routes(
             # generic 401/503).
             _recover_empty_session_model(sess, session, owner=owner)
             if not getattr(sess, "model", "").strip():
-                raise HTTPException(
-                    400,
-                    "No model selected for this chat. Open the model picker and choose one before sending.",
-                )
+                raise HTTPException(400, t("chat.no_model_selected"))
         except SessionNotFoundError as e:
             raise HTTPException(404, str(e))
         except (ValueError, ValidationError):
-            raise HTTPException(400, "Invalid request parameters")
+            raise HTTPException(400, t("chat.invalid_request"))
 
         # ------------------------------------------------------------------ #
         # Privilege gates that must fire BEFORE any LLM work / token spend.
@@ -1083,7 +1078,7 @@ def setup_chat_routes(
                     _active_streams.pop(session, None)
                     return
                 if not get_setting("image_gen_enabled", True):
-                    yield f'data: {json.dumps({"delta": "Image generation is disabled by the administrator."})}\n\n'
+                    yield f'data: {json.dumps({"delta": t("chat.image_gen_disabled")})}\n\n'
                     yield "data: [DONE]\n\n"
                     _active_streams.pop(session, None)
                     return
@@ -1436,7 +1431,7 @@ def setup_chat_routes(
     async def chat_resume(request: Request, session_id: str) -> StreamingResponse:
         _verify_session_owner(request, session_id)
         if not agent_runs.is_active(session_id):
-            raise HTTPException(404, "No active run for this session")
+            raise HTTPException(404, t("chat.no_active_run"))
         return StreamingResponse(agent_runs.subscribe(session_id), media_type="text/event-stream")
 
     # ------------------------------------------------------------------ #
@@ -1464,7 +1459,7 @@ def setup_chat_routes(
         if rec is None:
             if agent_runs.is_active(session_id):
                 return {"status": "streaming", "detached": True}
-            raise HTTPException(404, "No active stream for this session")
+            raise HTTPException(404, t("chat.no_active_stream"))
         return rec
 
     # ------------------------------------------------------------------ #
@@ -1480,7 +1475,7 @@ def setup_chat_routes(
             session_manager.save_sessions()
             return {"status": "context_injected"}
         except KeyError:
-            raise HTTPException(404, "Session not found")
+            raise HTTPException(404, t("chat.session_not_found_generic"))
 
     # ------------------------------------------------------------------ #
     # GET /api/search — search across chat messages
@@ -1519,21 +1514,21 @@ def setup_chat_routes(
         try:
             body = await request.json()
         except Exception:
-            raise HTTPException(400, "Invalid JSON")
+            raise HTTPException(400, t("chat.invalid_json_parse"))
 
         session_id = body.get("session_id")
         original_text = body.get("original_text", "")
         instruction = body.get("instruction", "")
 
         if not session_id or not original_text or not instruction:
-            raise HTTPException(400, "session_id, original_text, and instruction are required")
+            raise HTTPException(400, t("chat.session_required"))
 
         _verify_session_owner(request, session_id)
 
         try:
             sess = session_manager.get_session(session_id)
         except (KeyError, SessionNotFoundError):
-            raise HTTPException(404, "Session not found")
+            raise HTTPException(404, t("chat.session_not_found_generic"))
 
         messages = [
             {"role": "system", "content": (

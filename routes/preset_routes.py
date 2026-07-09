@@ -9,6 +9,7 @@ from pydantic import BaseModel, Field
 
 from src.request_models import PresetUpdateRequest
 from core.middleware import require_admin
+from core.translations import t
 from src.auth_helpers import effective_user
 
 logger = logging.getLogger(__name__)
@@ -46,7 +47,7 @@ def setup_preset_routes(preset_manager) -> APIRouter:
             return {"success": False, "message": "Failed to save preset"}
         except Exception as e:
             logger.error(f"Preset update error: {e}")
-            raise HTTPException(500, "Failed to update custom preset")
+            raise HTTPException(500, t("preset.update_failed"))
 
     @router.get("/api/presets/templates")
     async def get_user_templates() -> List[Dict]:

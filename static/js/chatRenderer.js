@@ -10,6 +10,7 @@ import spinnerModule from './spinner.js';
 import { bindMenuDismiss } from './escMenuStack.js';
 import { API_BASE } from './apiBase.js';
 import { matchModelKey } from './model/matchKey.js';
+import { t } from './i18n.js';
 
 const SEARCH_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>';
 const REPORT_ICON = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><line x1="10" y1="9" x2="8" y2="9"/></svg>';
@@ -340,12 +341,12 @@ function _openVisionEditor(att, userMsgEl) {
     saveBtn.innerHTML = '<span class="vision-btn-label">Saving…</span>';
     try {
       await _saveVisionText();
-      if (uiModule?.showToast) uiModule.showToast('Saved');
+      if (uiModule?.showToast) uiModule.showToast(t('chat.saved'));
       _closeVisionEditor();
     } catch (e) {
       saveBtn.disabled = false;
       saveBtn.innerHTML = '<span class="vision-btn-label">Save</span>';
-      if (uiModule?.showError) uiModule.showError('Failed to save OCR text');
+      if (uiModule?.showError) uiModule.showError(t('chat.ocr_save_failed'));
     }
   });
   // Regenerate-message: save the edited text, close, then trigger a resend of
@@ -365,12 +366,12 @@ function _openVisionEditor(att, userMsgEl) {
       if (userMsgEl && window.chatModule?.resendUserMessage) {
         window.chatModule.resendUserMessage(userMsgEl, { replaceFromHere: true });
       } else if (uiModule?.showToast) {
-        uiModule.showToast('Saved');
+        uiModule.showToast(t('chat.saved'));
       }
     } catch (e) {
       regenBtn.disabled = false;
       saveBtn.disabled = false;
-      if (uiModule?.showError) uiModule.showError('Failed to save OCR text');
+      if (uiModule?.showError) uiModule.showError(t('chat.ocr_save_failed'));
     }
   });
   actions.appendChild(closeBtn);
@@ -1030,9 +1031,9 @@ function _appendReportButton(container, sessionId) {
       chatBtn.disabled = false;
       chatBtn.innerHTML = origLabel;
       if (window.uiModule && uiModule.showError) {
-        uiModule.showError('Could not start follow-up chat: ' + e.message);
+        uiModule.showError(t('chat.followup_failed', { message: e.message }));
       } else {
-        alert('Could not start follow-up chat: ' + e.message);
+        alert(t('chat.followup_failed', { message: e.message }));
       }
     }
   });
@@ -1267,9 +1268,9 @@ export function buildImageBubble(imageUrl, prompt, model, size, quality, imageId
   delBtn.innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/></svg>';
   delBtn.addEventListener('click', async (e) => {
     e.stopPropagation();
-    const ok = await uiModule.styledConfirm('Delete this image?', {
-      confirmText: 'Delete',
-      cancelText: 'Cancel',
+    const ok = await uiModule.styledConfirm(t('chat.delete_image_confirm'), {
+      confirmText: t('chat.delete'),
+      cancelText: t('chat.cancel'),
       danger: true,
     });
     if (!ok) return;
@@ -2440,7 +2441,7 @@ export function addMessage(role, content, modelName, metadata) {
     return wrap;
   } catch (error) {
     console.error('Error in addMessage:', error);
-    if (uiModule) uiModule.showError('Failed to add message: ' + error.message);
+    if (uiModule) uiModule.showError(t('chat.add_message_failed', { message: error.message }));
   }
 }
 

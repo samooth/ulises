@@ -22,6 +22,7 @@ from fastapi import APIRouter, Query, Depends, Response, HTTPException
 from typing import List, Dict, Optional
 
 from core.middleware import require_admin
+from core.translations import t
 from src.url_safety import check_outbound_url
 
 logger = logging.getLogger(__name__)
@@ -832,7 +833,7 @@ def setup_contacts_routes():
                     try:
                         settings[key] = _validate_carddav_url(data[key])
                     except ValueError as e:
-                        raise HTTPException(400, str(e))
+                        raise HTTPException(400, t("contacts.sync_failed").format(error=str(e)))
                 else:
                     value = data[key]
                     if key == "carddav_password" and value:
