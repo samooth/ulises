@@ -266,7 +266,13 @@ class LsTool:
 
 class GlobTool:
     async def execute(self, content: str, ctx: dict) -> dict:
-        from src.tool_execution import _resolve_tool_path, _resolve_search_root, _truncate
+        from src.tool_execution import (
+            _SENSITIVE_BASENAMES,
+            _is_sensitive_path,
+            _resolve_tool_path,
+            _resolve_search_root,
+            _truncate,
+        )
         args = {}
         _s = (content or "").strip()
         if _s.startswith("{"):
@@ -286,13 +292,21 @@ class GlobTool:
 
         def _glob():
             base = os.path.abspath(root)
+            rbase = os.path.realpath(base)
             if not os.path.isdir(base):
                 return None, f"glob: {root}: not a directory"
             norm_pat = pattern.replace("\\", "/")
             # Fast path: literal pattern (no wildcards) → direct path lookup.
             if not any(c in norm_pat for c in "*?["):
-                cand = os.path.normpath(os.path.join(base, norm_pat))
-                if os.path.exists(cand):
+                cand = os.path.realpath(os.path.join(base, norm_pat))
+                nbase = os.path.normcase(rbase)
+                try:
+                    inside = cand == rbase or os.path.commonpath(
+                        [os.path.normcase(cand), nbase]
+                    ) == nbase
+                except ValueError:
+                    inside = False
+                if inside and os.path.exists(cand) and not _is_sensitive_path(cand):
                     return [cand], None
                 # Literal not at exact path — fall through to walk so
                 # e.g. "foo.py" still matches at any depth (like rglob).
@@ -304,11 +318,20 @@ class GlobTool:
                 for dp, dns, fns in os.walk(base):
                     # Prune skipped dirs before descending (unlike rglob which
                     # descends first then filters — fatal on large node_modules).
-                    dns[:] = [d for d in dns if d not in _CODENAV_SKIP_DIRS]
+                    # Sensitive dirs (.ssh, .gnupg, …) are pruned too so glob
+                    # never enumerates the keys/tokens inside them.
+                    dns[:] = [
+                        d for d in dns
+                        if d not in _CODENAV_SKIP_DIRS and d not in _SENSITIVE_BASENAMES
+                    ]
                     for name in fns + dns:
                         full = os.path.join(dp, name)
                         rel = os.path.relpath(full, base).replace(os.sep, "/")
                         if regex.fullmatch(rel) or regex.fullmatch(name):
+                            # Skip deny-listed sensitive files (.env, id_rsa,
+                            # known_hosts, …) the same way grep does.
+                            if _is_sensitive_path(os.path.realpath(full)):
+                                continue
                             try:
                                 mtime = os.stat(full).st_mtime
                             except OSError:
