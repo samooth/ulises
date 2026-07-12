@@ -755,6 +755,38 @@ def _extract_last_user_message(messages: List[Dict]) -> str:
     return ""
 
 
+def _strip_think_blocks(text: str) -> str:
+    """Linear-time equivalent of
+    ``re.sub(r'<think>.*?</think>', '', text, flags=DOTALL|IGNORECASE)``.
+
+    The lazy regex rescans to end-of-string from every ``<think>`` opener when
+    a closer is missing -> O(n^2) on untrusted model output (prompt injection
+    can echo thousands of openers). This forward-only scan pairs each opener
+    with the next closer in a single pass. Output is byte-for-byte identical to
+    the original narrow regex: only literal ``<think>``/``</think>`` (any case)
+    are matched, a dangling opener with no closer is left intact, and an orphan
+    ``</think>`` is never stripped.
+    """
+    if not text:
+        return text
+    lowered = text.lower()
+    parts = []
+    pos = 0
+    while True:
+        start = lowered.find("<think>", pos)
+        if start == -1:
+            parts.append(text[pos:])
+            break
+        end = lowered.find("</think>", start + 7)
+        if end == -1:
+            # No closer for this opener: lazy regex matches nothing here.
+            parts.append(text[pos:])
+            break
+        parts.append(text[pos:start])
+        pos = end + 8  # len("</think>")
+    return "".join(parts)
+
+
 _LOW_SIGNAL_RE = re.compile(r"^[\W_]*$", re.UNICODE)
 _CASUAL_OPENING_RE = re.compile(
     r"^\s*(?:h+i+|hey+|hello+|yo+|sup+|what'?s up|wass?up|hiya|howdy|"
@@ -773,7 +805,12 @@ _EXPLICIT_CONTINUATION_RE = re.compile(
     r"run it|launch it|start it|use that|that one|same|the same|"
     r"first|second|third|the first one|the second one|the third one|"
     r"[123]|[abc]"
-    r")\s*[.!?]*\s*$",
+    # `\s*[.!?]*\s*$` put two \s-matching quantifiers around `[.!?]*`, which
+    # backtracks O(n^2) on a terse reply + whitespace flood (py/polynomial-redos).
+    # `\s*(?:[.!?]+\s*)?$` accepts the same "trailing space/punctuation" tails
+    # (the inner \s* only engages after `[.!?]+`, so no two \s* are adjacent) and
+    # is linear.
+    r")\s*(?:[.!?]+\s*)?$",
     re.IGNORECASE,
 )
 _RETRY_CONTINUATION_RE = re.compile(
@@ -1065,6 +1102,9 @@ def _build_system_prompt(
     # the trusted system role. Bound up front so the insert block below can
     # always check it.
     _skills_message = None
+    _email_style_message = None
+    _integ_message = None
+    _mcp_desc_message = None
     if active_document:
         set_active_document(active_document.id)
         _doc_raw = active_document.current_content or ""
@@ -1273,9 +1313,9 @@ def _build_system_prompt(
             from src.settings import load_settings as _load_settings
             _style = (_load_settings().get("email_writing_style", "") or "").strip()
             if _style:
+                # Hardcoded identity/style rules stay in the trusted system prompt.
                 agent_prompt += (
-                    "\n\n📧 EMAIL WRITING STYLE AND IDENTITY — FOLLOW FOR ANY EMAIL DRAFT OR SEND:\n"
-                    f"{_style}\n\n"
+                    "\n\n"
                     "Hard identity rule: write as the user/mailbox owner only. Do not sign as, speak as, "
                     "or imply you are the recipient, original sender, quoted sender, spouse, assistant, "
                     "company, or any other third party. If a signature is needed, use only the name/signature "
@@ -1283,6 +1323,12 @@ def _build_system_prompt(
                     "Mechanical style rules: never use em dash/en dash; use --. Never use curly apostrophes. "
                     "For English emails, default to Hi [Name] or Hiya from the saved style rather than Hey. "
                     "If the saved style specifies Best/newline/name, use that sign-off when a sign-off is natural."
+                )
+                # User-editable style text is untrusted — wrap it so a malicious
+                # style value cannot inject system-role instructions.
+                _email_style_message = untrusted_context_message(
+                    "email writing style",
+                    "EMAIL WRITING STYLE AND IDENTITY — FOLLOW FOR ANY EMAIL DRAFT OR SEND:\n" + _style,
                 )
         except Exception:
             pass
@@ -1411,6 +1457,25 @@ def _build_system_prompt(
         except Exception as _sk_err:
             logger.debug(f"skill injection failed (non-fatal): {_sk_err}")
 
+    # Integration descriptions — user-editable fields, must not be in system role.
+    if not suppress_local_context:
+        try:
+            from src.integrations import get_integrations_prompt
+            _integ_prompt = get_integrations_prompt()
+            if _integ_prompt:
+                _integ_message = untrusted_context_message("integrations", _integ_prompt)
+        except Exception as _integ_err:
+            logger.debug(f"Integration prompt injection skipped: {_integ_err}")
+
+    # MCP tool descriptions — sourced from external servers, must not be in system role.
+    if mcp_mgr:
+        try:
+            _mcp_desc = mcp_mgr.get_tool_descriptions_for_prompt(mcp_disabled_map or {})
+            if _mcp_desc:
+                _mcp_desc_message = untrusted_context_message("MCP tools", _mcp_desc)
+        except Exception as _mcp_err:
+            logger.debug(f"MCP description injection skipped: {_mcp_err}")
+
     agent_msg = {"role": "system", "content": agent_prompt}
     insert_idx = 0
     for i, msg in enumerate(messages):
@@ -1449,6 +1514,15 @@ def _build_system_prompt(
         last_user_idx += 1  # the document message is now at last_user_idx
     if _email_message:
         merged.insert(last_user_idx, _email_message)
+        last_user_idx += 1
+    if _email_style_message:
+        merged.insert(last_user_idx, _email_style_message)
+        last_user_idx += 1
+    if _integ_message:
+        merged.insert(last_user_idx, _integ_message)
+        last_user_idx += 1
+    if _mcp_desc_message:
+        merged.insert(last_user_idx, _mcp_desc_message)
         last_user_idx += 1
     if _skills_message:
         merged.insert(last_user_idx, _skills_message)
@@ -1555,19 +1629,6 @@ def _build_base_prompt(
         except Exception as _e:
             # Skill index is a soft enhancement — never fail prompt assembly on it.
             logger.debug(f"Skill-index injection skipped: {_e}")
-
-    # Inject integration descriptions
-    if not suppress_local_context:
-        from src.integrations import get_integrations_prompt
-        integ_prompt = get_integrations_prompt()
-        if integ_prompt:
-            agent_prompt += "\n\n" + integ_prompt
-
-    # Inject MCP tool descriptions
-    if mcp_mgr:
-        mcp_desc = mcp_mgr.get_tool_descriptions_for_prompt(mcp_disabled_map or {})
-        if mcp_desc:
-            agent_prompt += mcp_desc
 
     return agent_prompt, skill_index_block
 
@@ -1837,7 +1898,7 @@ async def _run_verifier_subagent(
     except Exception as e:
         logger.warning(f"[agent] verifier subagent failed: {e}")
         return []
-    raw = re.sub(r"<think>.*?</think>", "", raw or "", flags=re.DOTALL | re.IGNORECASE)
+    raw = _strip_think_blocks(raw or "")
     last_v = None
     for line in raw.splitlines():
         if "VERIFICATION:" in line:
@@ -2465,7 +2526,6 @@ async def stream_agent_loop(
     # backstop. Counting identical repeats — not distinct same-tool calls —
     # lets a legit batch (e.g. 18 calendar events at once) through.
     _call_freq: collections.Counter = collections.Counter()
-    _THINK_RE = re.compile(r'<think>.*?</think>', re.DOTALL | re.IGNORECASE)
     _force_answer = False  # set by loop-breaker → next round runs with NO tools
     # Supervisor: how many times we've nudged the model after it announced
     # an action without emitting the tool call. Capped to prevent a model
@@ -2803,7 +2863,7 @@ async def stream_agent_loop(
             if tool_blocks:
                 logger.info(f"[agent] force-answer round {round_num}: discarding {len(tool_blocks)} ignored tool call(s)")
             tool_blocks = []
-            if not _THINK_RE.sub("", strip_tool_blocks(round_response)).strip():
+            if not _strip_think_blocks(strip_tool_blocks(round_response)).strip():
                 # The model burned its budget gathering data but never wrote a
                 # final answer (common with weaker models on multi-source
                 # briefings). Salvage it: one blunt non-streaming synthesis call
@@ -2826,7 +2886,7 @@ async def stream_agent_loop(
                         url=endpoint_url, model=model, messages=_synth_messages,
                         headers=headers, temperature=0.3, max_tokens=max_tokens, timeout=60,
                     )
-                    _synth = _THINK_RE.sub("", strip_tool_blocks(_raw or "")).strip()
+                    _synth = _strip_think_blocks(strip_tool_blocks(_raw or "")).strip()
                 except Exception as _e:
                     logger.warning(f"[agent] grace synthesis failed: {_e}")
                 if _synth:
@@ -2888,7 +2948,7 @@ async def stream_agent_loop(
             # the model fix them (capped, and it must do new effectful work
             # to re-trigger). Skipped on force-answer rounds (no tools to
             # fix with), pure Q&A, and when the toggle is off.
-            _claimed_done = bool(_THINK_RE.sub("", cleaned_round).strip())
+            _claimed_done = bool(_strip_think_blocks(cleaned_round).strip())
             if (_effectful_used and not _force_answer
                     and _claimed_done
                     and _verifier_rounds < _VERIFIER_MAX_ROUNDS
@@ -2932,7 +2992,7 @@ async def stream_agent_loop(
             # actual tool now") and loop again. Capped at
             # _MAX_INTENT_NUDGES so a model that genuinely cannot use the
             # tool doesn't pin us in a forever loop.
-            _intent_text = _THINK_RE.sub("", cleaned_round).strip()
+            _intent_text = _strip_think_blocks(cleaned_round).strip()
             _intent_match = _INTENT_RE.search(_intent_text) if _intent_text else None
             # Only nudge when the round REALLY looks like an unfinished
             # promise: short response (<400 chars), no fenced code/answer,
@@ -2995,7 +3055,7 @@ async def stream_agent_loop(
         # "Real" answer text = round text minus <think> blocks. Empty-think
         # rounds (just "<think>\n\n</think>" + a tool call) must not read as
         # progress, so strip think before checking.
-        _real_text = _THINK_RE.sub("", cleaned_round).strip()
+        _real_text = _strip_think_blocks(cleaned_round).strip()
         # Circling = repeating a recent call with nothing written. Any
         # progress (a NEW distinct call, or actual answer text) resets it.
         if _is_repeat and not _real_text:

@@ -85,6 +85,9 @@ output.txt.txt
 !docs/**/*.gif
 !docs/**/*.webp
 
+# PR draft bodies (cherry-pick tracking)
+PR*.md
+
 # Reports and temp files
 reports/
 tasks/
