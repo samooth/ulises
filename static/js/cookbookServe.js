@@ -490,12 +490,29 @@ function _estimateLlamaContextFit(model, fields, modelCtxMax, modelWeightsGb = 0
   }
   const raw = Math.floor(freeForKv / kvGbPerToken);
   const rounded = Math.max(1024, Math.floor(raw / 1024) * 1024);
-  const ctx = Math.min(modelMax, rounded);
+  let ctx = Math.min(modelMax, rounded);
+  let reasonSuffix = '';
+  if (isUnifiedMode) {
+    // Unified memory should not advertise *less* context than plain GPU mode
+    // for the same llama.cpp launch. It may be slower when pages spill into
+    // system RAM, but the memory pool is at least the GPU path plus overflow.
+    const gpuUsableGb = Math.max(1, totalVramGb - Math.max(1.0, selectedCount * 0.6));
+    const gpuFreeForKv = gpuUsableGb - modelGb;
+    if (gpuFreeForKv > 0) {
+      const gpuRaw = Math.floor(gpuFreeForKv / kvGbPerToken);
+      const gpuRounded = Math.max(1024, Math.floor(gpuRaw / 1024) * 1024);
+      const gpuCtx = Math.min(modelMax, gpuRounded);
+      if (gpuCtx > ctx) {
+        ctx = gpuCtx;
+        reasonSuffix = `; floored to GPU estimate`;
+      }
+    }
+  }
   return {
     ctx,
     modelGb,
     kvGbPerToken,
-    reason: `~${ctx.toLocaleString()} tokens fits llama.cpp KV (${freeForKv.toFixed(1)}G free ${isUnifiedMode ? 'unified' : 'VRAM'})`,
+    reason: `~${ctx.toLocaleString()} tokens fits llama.cpp KV (${freeForKv.toFixed(1)}G free ${isUnifiedMode ? 'unified' : 'VRAM'}${reasonSuffix})`,
   };
 }
 
@@ -1442,7 +1459,7 @@ function _rerenderCachedModels() {
       panelHtml += `<label class="hwfit-sf-cb cookbook-llama-gpu-only"><input type="checkbox" class="hwfit-sf" data-field="vision"${sv('vision',false)?' checked':''} /> Vision${_h('Serve with the vision encoder so the model can read images. Auto-finds an mmproj-*.gguf next to the model. Adds ~1 GB VRAM.')}</label>`;
       panelHtml += `<label class="hwfit-sf-cb"><input type="checkbox" class="hwfit-sf" data-field="llama_no_mmap"${sv('llama_no_mmap',false)?' checked':''} /> No mmap${_h('Adds --no-mmap. Useful for some high-context/local-storage setups.')}</label>`;
       panelHtml += `<label class="hwfit-sf-cb"><input type="checkbox" class="hwfit-sf" data-field="llama_no_warmup"${sv('llama_no_warmup',false)?' checked':''} /> Skip warmup${_h('Adds --no-warmup. Reduces startup memory spikes; llama.cpp defaults to warming up.')}</label>`;
-      panelHtml += `<label class="hwfit-sf-cb hwfit-spec-group"><input type="checkbox" class="hwfit-sf" data-field="llama_speculative_mtp"${sv('llama_speculative_mtp',false)?' checked':''} /> MTP Spec${_h('llama.cpp native MTP speculative decoding: --spec-type draft-mtp. Requires a GGUF with MTP heads.')} <span class="hwfit-numstep"><button type="button" class="hwfit-numstep-btn" data-step="-1" tabindex="-1" aria-label="Decrease">‹</button><input type="number" class="hwfit-sf hwfit-spec-tokens" data-field="llama_spec_tokens" value="${esc(sv('llama_spec_tokens', '3'))}" min="1" max="10" title="--spec-draft-n-max" /><button type="button" class="hwfit-numstep-btn" data-step="1" tabindex="-1" aria-label="Increase">›</button></span></label>`;
+      panelHtml += `<label class="hwfit-sf-cb hwfit-spec-group"><input type="checkbox" class="hwfit-sf" data-field="llama_speculative_mtp"${sv('llama_speculative_mtp',false)?' checked':''} /> MTP Spec${_h('llama.cpp native MTP speculative decoding: --spec-type draft-mtp. Requires a GGUF with MTP heads.')} <input type="number" class="hwfit-sf hwfit-spec-tokens hwfit-spec-tokens-bare" data-field="llama_spec_tokens" value="${esc(sv('llama_spec_tokens', '3'))}" min="1" max="10" title="--spec-draft-n-max" /></label>`;
       panelHtml += `</div>`;
       // Row 3b: Checkboxes (diffusers)
       panelHtml += `<div class="hwfit-serve-checks hwfit-backend-diffusers">`;
@@ -1805,7 +1822,7 @@ function _rerenderCachedModels() {
         vllm:   '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 4l7 16 7-16"/><path d="M14 4l4 9 3-9"/></svg>',
         sglang: '<span aria-hidden="true" style="display:block;width:14px;height:14px;background:currentColor;-webkit-mask:url(/static/icons/sglang-mark.png) center/contain no-repeat;mask:url(/static/icons/sglang-mark.png) center/contain no-repeat;"></span>',
         llamacpp: '<svg width="14" height="14" viewBox="0 0 600 600" fill="none" aria-hidden="true"><path d="M600 392L504.249 558L504.137 557.929C487.252 584.069 458.193 600 426.864 600H120L240 392H600Z" fill="currentColor"/><path d="M240 392H0L199.602 46.0254C216.032 17.5463 246.411 0 279.29 0H466.154L240 392Z" fill="currentColor"/></svg>',
-        ollama: '<img src="/static/icons/ollama-mark-crop.png" alt="" aria-hidden="true" width="14" height="14" style="display:block;width:14px;height:14px;object-fit:contain;" />',
+        ollama: '<span aria-hidden="true" style="display:block;width:14px;height:14px;background:currentColor;-webkit-mask:url(/static/icons/ollama-mark-crop.png) center/contain no-repeat;mask:url(/static/icons/ollama-mark-crop.png) center/contain no-repeat;"></span>',
         diffusers: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M5 5l2 2M17 17l2 2M5 19l2-2M17 7l2-2"/></svg>',
       };
 
