@@ -63,7 +63,7 @@
   },
   "session": {
     "active_run_block": "Session has an active run; try compacting after it finishes",
-    "ai_invalid_json": "AI returned invalid JSON for auto-sort \u2014 the model may not follow JSON instructions; try a different utility model in Settings.",
+    "ai_invalid_json": "AI returned invalid JSON for auto-sort — the model may not follow JSON instructions; try a different utility model in Settings.",
     "ai_no_groupings": "AI found no groupings",
     "archive_failed": "Failed to archive session",
     "archive_specific_failed": "Session {{id}} not found",
@@ -479,7 +479,8 @@
   "common": {
     "not_found": "Not found",
     "errors": {
-      "timeout": "Request exceeded {{seconds}}s timeout"
+      "timeout": "Request exceeded {{seconds}}s timeout",
+      "too_many_requests": "Too many requests"
     }
   },
   "contacts": {
@@ -518,7 +519,7 @@
     "no_sent_emails": "No sent emails found",
     "extract_too_few": "Only found {{count}} usable sent emails, need at least 3",
     "no_llm_endpoint": "No LLM endpoint configured",
-    "no_llm_endpoint_style": "No LLM endpoint configured \u2014 set a Utility or Default Chat model in Settings \u2192 AI Defaults.",
+    "no_llm_endpoint_style": "No LLM endpoint configured — set a Utility or Default Chat model in Settings → AI Defaults.",
     "style_generation_failed": "LLM failed to generate style description",
     "no_body": "No body provided",
     "llm_http_error": "LLM HTTP {{code}}",
@@ -527,12 +528,12 @@
     "account_not_found": "Account not found",
     "invalid_request_body": "invalid request body",
     "need_imap_credentials": "Need IMAP host, username, and password",
-    "oauth_client_id_missing": "GOOGLE_OAUTH_CLIENT_ID not set \u2014 add it to .env",
+    "oauth_client_id_missing": "GOOGLE_OAUTH_CLIENT_ID not set — add it to .env",
     "failed_to_send": "Failed to send email",
     "email_sent_to": "Email sent to {to}",
     "email_queued_for": "Email queued for {to}",
     "draft_saved": "Draft saved",
-    "all_endpoints_failed": "All endpoints failed ({{attempted}}): {{detail}}. Check your API keys in Settings \u2192 Services.",
+    "all_endpoints_failed": "All endpoints failed ({{attempted}}): {{detail}}. Check your API keys in Settings → Services.",
     "llm_returned_empty": "LLM returned empty response",
     "attached_email_label": "Attached email",
     "attached_email_empty": "(empty email attachment)",
@@ -548,5 +549,15 @@
     "date_label": "Date",
     "body_label": "Body",
     "attachments_label": "Attachments"
+  },
+  "chat_helpers": {
+    "model_not_allowed": "Your account is not allowed to use model '{{model}}'.",
+    "daily_limit_reached": "Daily message limit reached ({{cap}}). Try again in 24 hours."
+  },
+  "document_helpers": {
+    "not_found": "Document not found"
+  },
+  "chatgpt": {
+    "reconnect_provider": "Reconnect the provider."
   }
 }

@@ -4,7 +4,9 @@
 
 import json
 import os
+import re
 import logging
+import locale as _locale_mod
 from functools import lru_cache
 
 logger = logging.getLogger(__name__)
@@ -89,3 +91,76 @@ def t(key: str) -> str:
     lang = current_language.get()
     translator = get_translator(lang)
     return translator(key)
+
+
+# --- Pluralisation ---
+
+_PLURAL_SPLIT = re.compile(r"(?<!\\)\|")
+
+
+def tn(key: str, count: int, **vars) -> str:
+    """Translate a pluralised key.
+
+    Locale value uses pipe syntax::
+
+        "items": "{{count}} item|{{count}} items"
+
+    The first segment is singular (count=1), the second is plural (count≠1).
+
+    Additional ``**vars`` are substituted into the chosen form with
+    ``.format()`` (single-brace syntax).
+    """
+    msg = t(key)
+    parts = _PLURAL_SPLIT.split(msg)
+    form = parts[1] if count != 1 and len(parts) > 1 else parts[0]
+    return form.format(count=count, **vars)
+
+
+# --- Number / date formatting ---
+
+
+def format_number(value, decimals: int = 0) -> str:
+    """Format a number with the current language's grouping and decimal rules."""
+    lang = current_language.get()
+    lang_to_locale = {"en": "en_US.UTF-8", "es": "es_ES.UTF-8", "fr": "fr_FR.UTF-8",
+                      "de": "de_DE.UTF-8", "it": "it_IT.UTF-8",
+                      "pt": "pt_BR.UTF-8", "ja": "ja_JP.UTF-8",
+                      "zh": "zh_CN.UTF-8", "ko": "ko_KR.UTF-8",
+                      "ru": "ru_RU.UTF-8", "ar": "ar_AE.UTF-8"}
+    loc = lang_to_locale.get(lang, "en_US.UTF-8")
+    try:
+        old = _locale_mod.setlocale(_locale_mod.LC_NUMERIC, loc)
+        formatted = _locale_mod.format_string(f"%.{decimals}f", value, grouping=True)
+        _locale_mod.setlocale(_locale_mod.LC_NUMERIC, old)
+        return formatted
+    except Exception:
+        return f"{value:.{decimals}f}"
+
+
+def format_date(date, fmt: str = "short") -> str:
+    """Format a date using the current language's conventions.
+
+    ``fmt`` is one of ``"short"``, ``"medium"``, ``"long"``, or a custom
+    strftime pattern.  When not a known short name the value is passed
+    directly to ``strftime``.
+    """
+    import time as _time
+    lang = current_language.get()
+    lang_to_locale = {"en": "C", "es": "es_ES.UTF-8", "fr": "fr_FR.UTF-8",
+                      "de": "de_DE.UTF-8", "it": "it_IT.UTF-8",
+                      "pt": "pt_BR.UTF-8", "ja": "ja_JP.UTF-8",
+                      "zh": "zh_CN.UTF-8", "ko": "ko_KR.UTF-8",
+                      "ru": "ru_RU.UTF-8", "ar": "ar_AE.UTF-8"}
+    patterns = {"short": "%x", "medium": "%x %H:%M", "long": "%c"}
+    strf = patterns.get(fmt, fmt)
+    loc = lang_to_locale.get(lang, "C")
+    try:
+        old = _locale_mod.setlocale(_locale_mod.LC_TIME, loc)
+        result = date.strftime(strf)
+        _locale_mod.setlocale(_locale_mod.LC_TIME, old)
+        return result
+    except Exception:
+        try:
+            return date.strftime(strf)
+        except Exception:
+            return str(date)

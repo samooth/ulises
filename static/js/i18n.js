@@ -7,6 +7,7 @@ const STORAGE_KEY = 'ulises-lang'
 const FALLBACK_LANG = 'en'
 
 let _locale = null
+let _fallbackLocale = null
 let _lang = FALLBACK_LANG
 let _ready = false
 
@@ -46,11 +47,11 @@ async function _loadLocale(lang) {
 }
 
 export function t(key, vars) {
-  if (!_locale) return key
   let val = _resolve(_locale, key)
-  if (val === null) {
-    return key
+  if (val === null && _fallbackLocale) {
+    val = _resolve(_fallbackLocale, key)
   }
+  if (val === null) return key
   return _interpolate(val, vars)
 }
 
@@ -89,7 +90,8 @@ export function setLanguage(code) {
 
 export async function init() {
   _lang = _detectLanguage()
-  _locale = await _loadLocale(_lang)
+  _fallbackLocale = await _loadLocale(FALLBACK_LANG)
+  _locale = _lang === FALLBACK_LANG ? _fallbackLocale : await _loadLocale(_lang)
   _ready = true
   _applyTranslations()
   document.documentElement.lang = _lang
@@ -105,4 +107,36 @@ export function isReady() {
 
 export function reapply(root) {
   _applyTranslations(root)
+}
+
+// --- Pluralisation ---
+
+export function tn(key, count, vars) {
+  const msg = t(key)
+  if (!msg || msg === key) return msg
+  const parts = msg.split('|')
+  const form = count === 1 ? parts[0] : (parts[1] || parts[0])
+  const allVars = Object.assign({}, vars, { count })
+  return form.replace(/\{\{(\w+)\}\}/g, (_, k) =>
+    allVars[k] !== undefined ? String(allVars[k]) : `{{${k}}}`
+  )
+}
+
+// --- Number / date formatting ---
+
+export function formatNumber(value, options) {
+  try {
+    return new Intl.NumberFormat(_lang, options).format(value)
+  } catch {
+    return String(value)
+  }
+}
+
+export function formatDate(date, options) {
+  try {
+    const d = date instanceof Date ? date : new Date(date)
+    return new Intl.DateTimeFormat(_lang, options).format(d)
+  } catch {
+    return String(date)
+  }
 }

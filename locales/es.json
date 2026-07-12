@@ -26,7 +26,9 @@
     "account_created": "Cuenta creada",
     "admin_account_created": "Cuenta de administrador creada",
     "not_your_token": "No es tu token",
-    "token_not_found": "Token no encontrado"
+    "token_not_found": "Token no encontrado",
+    "api_token_route_required": "Se requiere ruta de API token",
+    "privilege_denied": "Privilegio denegado"
   },
   "admin": {
     "admin_only": "Solo administradores",
@@ -56,7 +58,8 @@
     "image_gen_disabled": "La generación de imágenes está deshabilitada por el administrador.",
     "session_required": "session_id, original_text e instruction son obligatorios",
     "invalid_json_parse": "JSON inválido",
-    "request_parsing_error": "Error al analizar la solicitud: {{error}}"
+    "request_parsing_error": "Error al analizar la solicitud: {{error}}",
+    "invalid_preset_id": "ID de preset inválido: {{preset_id}}"
   },
   "session": {
     "active_run_block": "La sesión tiene una ejecución activa; intenta compactar después de que termine",
@@ -92,7 +95,10 @@
     "topic_analysis_failed": "Error al analizar el tema: {{error}}",
     "unarchive_failed": "Error al desarchivar la sesión",
     "unarchive_specific_failed": "Sesión '{{id}}' no encontrada",
-    "unstar_before_delete": "Quita la estrella de la sesión antes de eliminarla"
+    "unstar_before_delete": "Quita la estrella de la sesión antes de eliminarla",
+    "export_conversation": "Conversación exportada",
+    "export_exported_on": "Exportado el",
+    "export_model": "Modelo"
   },
   "assistant": {
     "not_authenticated": "No autenticado",
@@ -200,7 +206,10 @@
     "text_must_be_string": "El texto debe ser una cadena",
     "upload_failed": "Error al subir: {{error}}",
     "save_failed": "Error al guardar el archivo: {{error}}",
-    "handler_not_configured": "Manejador de carga no configurado"
+    "handler_not_configured": "Manejador de carga no configurado",
+    "file_empty": "El archivo está vacío",
+    "file_type_not_allowed": "Tipo de archivo no permitido: {{content_type}}",
+    "rate_limited": "Límite de velocidad de carga alcanzado"
   },
   "document": {
     "create_failed": "Error al crear el documento: {{error}}",
@@ -281,8 +290,25 @@
     "discord_error": "Discord devolvió HTTP {{status}}: {{text}}",
     "request_failed": "Error en la solicitud: {{error}}"
   },
+  "common": {
+    "errors": {
+      "timeout": "La solicitud excedió el tiempo de espera de {{seconds}}s",
+      "too_many_requests": "Demasiadas solicitudes"
+    },
+    "not_found": "No encontrado"
+  },
   "companion": {
-    "admin_note": "Solo administradores. Cada código genera un nuevo token, que se muestra una sola vez."
+    "admin_note": "Solo administradores. Cada código genera un nuevo token, que se muestra una sola vez.",
+    "host": "Host:",
+    "pair_button": "Emparejar",
+    "pair_description": "Genera un código de emparejamiento de un solo uso para vincular un dispositivo",
+    "pair_title": "Emparejar un dispositivo",
+    "pairing_code": "Código QR de emparejamiento",
+    "pairing_qr_unavailable": "Código QR no disponible",
+    "pairing_warning": "Se muestra una vez. Esto concede acceso de chat a tu Ulises; revócalo en Configuración &rarr; Tokens API (id {{token_id}}). El dispositivo debe estar en la misma red y el servidor debe enlazarse a tu LAN.",
+    "payload": "Carga útil:",
+    "port": "Puerto:",
+    "token": "Token:"
   },
   "mcp": {
     "auth_successful": "Autorización Exitosa",
@@ -303,7 +329,8 @@
     "step3": "3. Copia la URL completa de la barra de direcciones de tu navegador",
     "step4": "4. Pégala abajo y haz clic en Conectar",
     "paste_url": "Pega la URL de tu navegador después de iniciar sesión:",
-    "connect": "Conectar"
+    "connect": "Conectar",
+    "sign_in_with_google": "Iniciar sesión con Google"
   },
   "copilot": {
     "device_code_failed": "La solicitud de código de dispositivo de GitHub falló (HTTP {{status}})",
@@ -315,7 +342,23 @@
     "generic_skill": "La habilidad está marcada como genérica",
     "audit_flagged": "La auditoría marcó la habilidad como genérica o innecesaria",
     "no_skills_to_audit": "No hay habilidades para auditar.",
-    "tidy_reason": "Nada que ordenar"
+    "tidy_reason": "Nada que ordenar",
+    "audit_all_log": "Registro de auditoría completa",
+    "audit_nightly_log": "Registro de auditoría nocturna",
+    "could_not_download": "No se pudo descargar",
+    "could_not_parse_skill_md": "No se pudo analizar el Markdown de la skill",
+    "generic_or_unnecessary": "Genérico o innecesario",
+    "import_failed": "Error al importar",
+    "markdown_required": "Se requiere Markdown",
+    "no_builtin_tool": "No hay herramienta integrada",
+    "no_model_configured": "No hay modelo configurado",
+    "not_found": "Skill no encontrada",
+    "query_required": "Se requiere consulta",
+    "slash_unavailable": "Slash command no disponible",
+    "source_unavailable": "Fuente no disponible",
+    "source_unavailable_legacy": "Fuente heredada no disponible",
+    "text_required": "Se requiere texto",
+    "update_failed": "Error al actualizar"
   },
   "search": {
     "query_required": "La consulta es obligatoria",
@@ -345,7 +388,39 @@
     "path_no_fragment": "La ruta no debe contener un fragmento",
     "request_timed_out": "La solicitud a {{name}} agotó el tiempo de espera",
     "request_failed": "Error en la solicitud: {{error}}",
-    "unexpected_error": "Error inesperado: {{error}}"
+    "unexpected_error": "Error inesperado: {{error}}",
+    "base_url_must_be_http": "La URL base debe comenzar con http:// o https://",
+    "base_url_no_query_fragment": "La URL base no debe contener query string ni fragmento",
+    "base_url_required": "La URL base es requerida",
+    "name_required": "El nombre es requerido"
+  },
+  "llm": {
+    "access_denied": "{{provider}} denegó el acceso (403)",
+    "all_fallbacks_failed": "Todos los fallbacks del LLM fallaron",
+    "auth_check_endpoint": ". Revisa Endpoints de Modelo → {{provider}} y vuelve a pegar la key.",
+    "auth_detail_suffix": " — {{detail}}",
+    "auth_rejected": "{{provider}} rechazó la API key",
+    "cannot_reach": "No se puede alcanzar {{host}}",
+    "cannot_reach_with_reason": "No se puede alcanzar {{host}}: {{error}}",
+    "chatgpt_credentials_expired": "Credenciales de ChatGPT expiradas",
+    "chatgpt_rate_limit": "Límite de velocidad de ChatGPT alcanzado",
+    "chatgpt_request_failed": "Solicitud a ChatGPT fallida",
+    "detail_colon": ": {{detail}}",
+    "detail_paren": " ({{detail}})",
+    "host_unreachable": "Upstream {{host}} inalcanzable (cooldown activo)",
+    "http_status_detail": "{{provider}} devolvió HTTP {{status}}",
+    "network_error": "Error de red",
+    "no_endpoint": "No hay endpoint LLM configurado",
+    "not_found_404": "{{provider}} devolvió 404 — revisa la URL base y el nombre del modelo.",
+    "outage": "{{provider}} está caído (HTTP {{status}}).",
+    "post_failed": "Error POST a {{url}}: {{error}}",
+    "post_failed_after_retries": "POST {{url}} falló tras {{retries}} intentos: {{error}}",
+    "primary_model_failed": "El modelo principal '{model}' falló",
+    "rate_limited_upstream": "{{provider}} limitó la velocidad (429).",
+    "read_timeout": "Tiempo de espera de lectura agotado",
+    "unexpected_schema": "Esquema inesperado de {{url}}: {{data}}",
+    "upstream_error": "Error upstream {{url}} -> {{status}}: {{text}}",
+    "upstream_error_stream": "HTTP {{status}}: {{text}}"
   },
   "ai_interaction": {
     "pipeline_format": "Cada línea debe ser: model | instruction (o usa formato JSON)",
@@ -389,7 +464,16 @@
     "required": "El mensaje es obligatorio",
     "cannot_be_empty": "El mensaje no puede estar vacío",
     "exceeds_max_length": "El mensaje supera la longitud máxima",
-    "no_file_or_invalid": "No se subió ningún archivo o el nombre del archivo es inválido"
+    "no_file_or_invalid": "No se subió ningún archivo o el nombre del archivo es inválido",
+    "file_empty": "El archivo está vacío",
+    "file_read_error": "Error al leer archivo: {error}",
+    "file_too_large": "El archivo excede el límite de {{limit}}",
+    "invalid_json_body": "Cuerpo JSON inválido",
+    "missing_parameters": "Faltan parámetros requeridos",
+    "request_processing_error": "Error al procesar la solicitud",
+    "session_id_required": "Se requiere ID de sesión",
+    "session_not_found": "Sesión '{{session_id}}' no encontrada",
+    "unsupported_file_type": "Tipo de archivo '{{ext}}' no permitido"
   },
   "generated_images": {
     "invalid_filename": "Nombre de archivo inválido",
@@ -402,11 +486,78 @@
   "contacts": {
     "sync_failed": "Error en la sincronización de contactos"
   },
+  "email": {
+    "account_not_found": "Cuenta de correo no encontrada",
+    "all_endpoints_failed": "Todos los endpoints fallaron ({{attempted}}): {{detail}}. Revisa tus API keys en Configuración → Servicios.",
+    "attached_email_could_not_parse": "No se pudo analizar el correo adjunto",
+    "attached_email_empty": "El correo adjunto está vacío",
+    "attached_email_label": "Correo adjunto",
+    "attachment_not_found": "Archivo adjunto índice {{index}} no encontrado",
+    "attachments_label": "Archivos adjuntos",
+    "body_label": "Cuerpo:",
+    "cc_label": "CC:",
+    "date_label": "Fecha:",
+    "draft_not_found": "Borrador no encontrado",
+    "draft_saved": "Borrador guardado",
+    "email_not_found": "Correo no encontrado",
+    "email_not_found_uid": "Correo UID {{uid}} no encontrado",
+    "email_queued_for": "Correo encolado para envío",
+    "email_sent_to": "Correo enviado a",
+    "empty_doc_content": "_({{filename}} vacío)_",
+    "empty_response": "Respuesta vacía del LLM",
+    "extract_too_few": "Solo se encontraron {{count}} correos enviados utilizables, se necesitan al menos 3",
+    "failed_read_docx": "Error al leer docx: {{error}}",
+    "failed_read_email_attachment": "Error al leer archivo adjunto del correo",
+    "failed_read_text": "Error al leer archivo de texto: {{error}}",
+    "failed_to_create_document": "Error al crear documento",
+    "failed_to_send": "Error al enviar correo",
+    "folder_not_found": "Carpeta no encontrada: {{folder}}",
+    "from_label": "De:",
+    "imported_attached_email": "Correo adjunto importado",
+    "imported_attachment": "Archivo adjunto importado",
+    "imported_docx": "Documento .docx importado",
+    "invalid_attachment_path": "Ruta de archivo adjunto inválida",
+    "invalid_filename": "Nombre de archivo inválido",
+    "invalid_query": "Consulta inválida",
+    "invalid_request_body": "Cuerpo de solicitud inválido",
+    "llm_http_error": "LLM HTTP {{code}}",
+    "llm_returned_empty": "El LLM devolvió una respuesta vacía",
+    "move_failed": "Error al mover a {{folder}}",
+    "name_required": "El nombre es requerido",
+    "need_imap_credentials": "Se requieren credenciales IMAP",
+    "no_body": "Sin cuerpo",
+    "no_llm_endpoint": "No hay endpoint LLM configurado",
+    "no_llm_endpoint_style": "No hay endpoint LLM para este estilo",
+    "no_readable_body": "No hay cuerpo legible",
+    "no_sent_emails": "No hay correos enviados",
+    "no_smtp_capable": "SMTP no está configurado para esta cuenta",
+    "no_smtp_on_account": "La cuenta {{name}} no tiene SMTP configurado",
+    "oauth_client_id_missing": "Falta el client_id de OAuth",
+    "operation_failed": "Operación fallida",
+    "operation_failed_detail": "Operación de correo fallida: {{detail}}",
+    "python_docx_not_installed": "python-docx no está instalado",
+    "send_at_future": "La fecha de envío debe ser futura",
+    "send_at_iso8601": "Formato de fecha ISO 8601 inválido",
+    "send_at_required": "La fecha de envío es requerida",
+    "style_generation_failed": "Error al generar estilo",
+    "to_label": "Para:",
+    "unsupported_attachment_type": "Tipo de adjunto '{{ext}}' no soportado"
+  },
   "editor_draft": {
     "deleted": "Eliminado"
   },
   "validators": {
     "ssh_port_requires_host": "ssh_port requiere un host",
     "invalid_ssh_port": "ssh_port inválido"
+  },
+  "chat_helpers": {
+    "model_not_allowed": "Tu cuenta no tiene permitido usar el modelo '{{model}}'.",
+    "daily_limit_reached": "Límite de mensajes diarios alcanzado ({{cap}}). Intenta de nuevo en 24 horas."
+  },
+  "document_helpers": {
+    "not_found": "Documento no encontrado"
+  },
+  "chatgpt": {
+    "reconnect_provider": "Reconecta el proveedor."
   }
 }

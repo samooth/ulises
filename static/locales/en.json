@@ -20,6 +20,7 @@
     "select": "Select",
     "probe": "Probe",
     "copied": "Copied",
+    "unknown": "unknown",
     "copy_failed": "Copy failed",
     "all": "All",
     "none": "None",
@@ -67,7 +68,6 @@
       "offline": "You appear to be offline"
     }
   },
-
   "auth": {
     "title": "Ulises — Login",
     "page_title": "Ulises",
@@ -138,7 +138,6 @@
       "cannot_delete_user": "Cannot delete user"
     }
   },
-
   "chat": {
     "title": "Ulises Chat",
     "page_titles": {
@@ -231,7 +230,6 @@
       "tool_blocked": "Tool blocked by policy"
     }
   },
-
   "sidebar": {
     "aria_label": "Sidebar",
     "toggle": "Toggle sidebar",
@@ -295,7 +293,6 @@
       "settings": "Settings"
     }
   },
-
   "memory": {
     "title": "Brain",
     "aria_label": "Brain",
@@ -395,7 +392,6 @@
       "max_skills_hint": "Set to 0 to disable skill injection."
     }
   },
-
   "theme": {
     "title": "Theme",
     "aria_label": "Theme",
@@ -494,7 +490,6 @@
       "reset_default": "Reset to Default"
     }
   },
-
   "prompt": {
     "title": "Prompt",
     "aria_label": "Prompt",
@@ -542,7 +537,6 @@
       "start": "Start"
     }
   },
-
   "settings": {
     "title": "Settings",
     "aria_label": "Settings",
@@ -892,11 +886,9 @@
       }
     }
   },
-
   "search_overlay": {
     "placeholder": "Search conversations..."
   },
-
   "rename_session": {
     "aria_label": "Rename session",
     "title": "Rename Session",
@@ -909,7 +901,6 @@
       "failed": "Failed to rename session"
     }
   },
-
   "cookbook": {
     "title": "Cookbook",
     "aria_label": "Cookbook",
@@ -986,7 +977,6 @@
       "model_not_cached": "Model not found in cache — switch to the Serve tab manually"
     }
   },
-
   "document": {
     "email_account_receive_only": "Selected email account is receive-only; using your SMTP account.",
     "ai_nothing_to_fill": "AI found nothing to fill",
@@ -1047,11 +1037,16 @@
       "enter_style_prompt": "Enter a style prompt",
       "style_applied": "Style applied",
       "style_transfer_failed": "Style transfer failed: {{error}}",
-      "pasted_new_layer": "Pasted as new layer"
+      "pasted_new_layer": "Pasted as new layer",
+      "clone_source_set": "Clone source set",
+      "clone_double_tap_first": "Double-tap first to set a clone source",
+      "clone_alt_click_first": "Alt-click first to set a clone source",
+      "select_unlocked_layer": "Select an unlocked layer",
+      "transform_applied": "Transform applied"
     }
   },
-
   "calendar": {
+    "reminder_title": "Calendar Reminder",
     "reminder_set": "Reminder set for {{time}}",
     "refreshed": "Calendar refreshed",
     "moved": "Moved",
@@ -1084,7 +1079,6 @@
       "no_start_time": "Model did not produce a start time"
     }
   },
-
   "email": {
     "errors": {
       "integration_unavailable": "Email integration is not available",
@@ -1092,12 +1086,10 @@
       "invalid_send": "Invalid send payload: {{error}}"
     }
   },
-
   "tasks": {
     "not_found": "Task not found",
     "not_assistant_task": "Not an assistant task"
   },
-
   "admin": {
     "setup_failed_setup": "Setup failed",
     "endpoint_refreshed": "Endpoint status refreshed",
@@ -1113,7 +1105,6 @@
       "feature_not_available": "Feature not available"
     }
   },
-
   "compare": {
     "all_verified": "All models verified",
     "model_failed": "{{name}} failed: {{error}}",
@@ -1125,9 +1116,19 @@
     "mode_shuffle_blind": "Mode: Shuffle on · Blind on",
     "mode_save": "Mode: Save ",
     "copied_to_clipboard": "Copied comparison to clipboard",
-    "prompt_copied": "Prompt copied!"
+    "prompt_copied": "Prompt copied!",
+    "select_at_least_one": "Select at least 1 model",
+    "search_failed": "Search compare failed: {{message}}",
+    "compare_failed": "Compare failed: {{message}}",
+    "failed_to_load_models": "Failed to load models",
+    "a_model": "a model",
+    "mode_blind_on": "Mode: Blind on",
+    "mode_blind_off": "Mode: Blind off",
+    "mode_parallel": "Mode: Parallel",
+    "mode_sequential": "Mode: Sequential",
+    "mode_save_on": "Mode: Save on",
+    "mode_save_off": "Mode: Save off"
   },
-
   "research": {
     "no_research": "No research found for this session",
     "no_result": "No research result available",
@@ -1141,14 +1142,12 @@
     "endpoint_no_model": "Endpoint is not configured with a usable model.",
     "no_endpoints": "No endpoints configured. Add one in Settings first."
   },
-
   "voice": {
     "stt_unavailable": "STT service not available or set to browser mode",
     "empty_audio": "Empty audio file",
     "transcription_failed": "Transcription failed",
     "tts_cache_cleared": "Cache cleared"
   },
-
   "assistant": {
     "unavailable": "Assistant session unavailable",
     "could_not_open": "Could not open assistant",
@@ -1159,12 +1158,10 @@
     "not_found": "Assistant not found",
     "not_available": "Assistant not available"
   },
-
   "connection": {
     "successful": "Connection successful",
     "failed": "Connection failed: {{error}}"
   },
-
   "webhook": {
     "name_required": "Webhook name is required",
     "not_found": "Webhook not found",
@@ -1176,7 +1173,6 @@
     "could_not_discover": "Could not discover models from endpoint",
     "session_manager_unavailable": "Session manager not available"
   },
-
   "vault": {
     "bw_not_installed": "bw CLI not installed (install `nodejs-bitwarden-cli` or `bitwarden-cli`)",
     "launch_failed": "Failed to launch bw: {{error}}",
@@ -1187,7 +1183,6 @@
     "unlocked": "Vault unlocked",
     "locked": "Vault locked"
   },
-
   "files": {
     "no_files": "No files uploaded",
     "file_too_large": "File too large",
@@ -1201,7 +1196,6 @@
     "vision_failed": "Vision analysis failed: {{error}}",
     "text_must_be_string": "Text must be a string"
   },
-
   "ntfy": {
     "sent_instruction": "Sent to {{url}} — on your ntfy app, subscribe to topic \"{{topic}}\" with server \"{{base}}\" (or paste the full URL: {{full_url}}).",
     "http_error": "ntfy returned HTTP {{status}} from {{url}}: {{text}}",
@@ -1211,7 +1205,6 @@
     "discord_error": "Discord returned HTTP {{status}}: {{text}}",
     "request_failed": "Request failed: {{error}}"
   },
-
   "api_tokens": {
     "unknown_profile": "Unknown token profile",
     "unknown_scope": "Unknown token scope: {{scope}}",
@@ -1219,32 +1212,27 @@
     "not_found": "Token not found",
     "not_yours": "Not your token"
   },
-
   "codex": {
     "missing_scope": "API token missing required scope: {{scope}}",
     "no_owner": "API token has no owner",
     "plugin_not_found": "Codex plugin bundle not found"
   },
-
   "backup": {
     "invalid_json": "Invalid JSON",
     "expected_object": "Expected a JSON object",
     "no_data_found": "No recognized data found in the file",
     "imported": "Imported: {{items}}"
   },
-
   "diagnostics": {
     "logs_failed": "Failed to retrieve logs: {{error}}",
     "db_stats_failed": "Failed to retrieve database statistics",
     "rag_unavailable": "RAG system not available",
     "invalid_youtube_url": "Invalid YouTube URL"
   },
-
   "cleanup": {
     "preview_failed": "Cleanup preview generation failed",
     "operation_failed": "Cleanup operation failed"
   },
-
   "embedding": {
     "fastembed_not_installed": "fastembed is not installed",
     "unknown_model": "Unknown model: {{name}}",
@@ -1257,7 +1245,6 @@
     "rejected_url": "Rejected endpoint URL: {{reason}}",
     "unreachable": "Endpoint unreachable: {{error}}"
   },
-
   "shell": {
     "no_command": "No command provided",
     "timed_out": "Command timed out after {{timeout}}s",
@@ -1270,7 +1257,6 @@
     "diffusers_needs_torch": "Diffusers serving needs both diffusers and torch.",
     "pty_not_supported": "PTY streaming is not supported on this platform"
   },
-
   "skills": {
     "generic_skill": "Skill is tagged generic",
     "audit_flagged": "Audit flagged the skill as generic or unnecessary",
@@ -1280,12 +1266,10 @@
     "no_skills_to_audit": "No skills to audit.",
     "tidy_reason": "Nothing to tidy"
   },
-
   "search": {
     "query_required": "Query is required",
     "unknown_provider": "Unknown provider"
   },
-
   "companion": {
     "pair_title": "Pair a device",
     "pair_desc": "Generate a one-time pairing code (a chat-scoped API token) for a LAN client.",
@@ -1299,7 +1283,6 @@
     "shown_once": "Shown once. This grants chat access to your Ulises; revoke it in Settings → API tokens (id ...). The device must be on the same network, and the server must bind to your LAN.",
     "qr_unavailable": "QR rendering unavailable -- enter the details manually."
   },
-
   "mcp": {
     "auth_successful": "Authorization Successful",
     "auth_connecting": "The MTP server is connecting. You can close this window and return to Ulises.",
@@ -1321,7 +1304,6 @@
     "paste_url": "Paste the URL from your browser after signing in:",
     "connect": "Connect"
   },
-
   "ai_interaction": {
     "pipeline_format": "Each line must be: model | instruction (or use JSON format)",
     "pipeline_no_steps": "No pipeline steps provided",
@@ -1371,7 +1353,6 @@
     "image_gen_timed_out": "Image generation timed out (300s). The model may be overloaded — try again or use quality=low.",
     "image_gen_error": "Image generation error: {{error}}"
   },
-
   "agent_tools": {
     "bash_timed_out": "bash: timed out after {{timeout}}s — process killed",
     "python_timed_out": "python: timed out after {{timeout}}s — process killed",
@@ -1386,7 +1367,6 @@
     "missing_action": "Missing action (rename|archive|delete|important|truncate|fork|list|switch)",
     "need_session_id": "Need a session_id (or 'current' for the active chat)"
   },
-
   "rag": {
     "collection_not_initialized": "Collection not initialized",
     "empty_document_list": "Empty document list",
@@ -1395,7 +1375,6 @@
     "no_docs_found": "No docs found",
     "removed_chunks": "Removed {{count}} chunks"
   },
-
   "youtube": {
     "api_unavailable": "YouTube transcript API not available",
     "failed_after_retries": "Failed after {{count}} attempts",
@@ -1403,7 +1382,6 @@
     "comment_fetch_timed_out": "Comment fetch timed out",
     "yt_dlp_not_installed": "yt-dlp not installed"
   },
-
   "integration": {
     "not_found": "Integration not found: {{id}}",
     "disabled": "Integration '{{name}}' is disabled",
@@ -1414,14 +1392,12 @@
     "request_failed": "Request failed: {{error}}",
     "unexpected_error": "Unexpected error: {{error}}"
   },
-
   "upload": {
     "handler_failed": "Upload handler not configured",
     "save_failed": "Failed to save file: {{error}}",
     "access_denied": "Access denied",
     "not_found": "File not found"
   },
-
   "session": {
     "unstar_before_delete": "Unstar the session before deleting it",
     "delete_failed": "Failed to delete session",
@@ -1434,7 +1410,6 @@
       "topic_analysis_failed": "Topic analysis failed: {{error}}"
     }
   },
-
   "copilot": {
     "device_code_failed": "GitHub device-code request failed (HTTP {{status}})",
     "device_code_request_failed": "GitHub device-code request failed: {{error}}",

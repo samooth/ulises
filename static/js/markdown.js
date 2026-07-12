@@ -7,6 +7,7 @@
 import uiModule from './ui.js';
 import { splitTableRow } from './markdown/tableRow.js';
 import { replaceEmojiShortcodes, hasEmojiShortcode } from './emojiShortcodes.js';
+import { t } from './i18n.js';
 
 var escapeHtml = uiModule.esc;
 
@@ -334,7 +335,7 @@ function createThinkingSection(thinkingContent, index = 0, thinkingTime = null) 
     <div class="thinking-section">
       <div class="thinking-header" data-thinking-id="${id}">
         <div class="thinking-header-left">
-          <span>View thinking process</span>
+          <span>${t('markdown.view_thinking_process')}</span>
         </div>
         <div style="display:flex;align-items:center;gap:6px;">
           ${timeHtml}
@@ -356,7 +357,7 @@ function createTaskCompletedMarker() {
       <span class="task-completed-icon" aria-hidden="true">
         <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
       </span>
-      <span>Task completed</span>
+      <span>${t('markdown.task_completed')}</span>
     </div>
   `;
 }
@@ -445,7 +446,7 @@ export function createCollapsible(contentMarkdown, label = 'details') {
   return `
     <div class="thinking-section">
       <div class="thinking-header" data-thinking-id="${id}">
-        <div class="thinking-header-left"><span data-label="${safeLabel}">View ${safeLabel}</span></div>
+        <div class="thinking-header-left"><span data-label="${safeLabel}">${t('markdown.view')} ${safeLabel}</span></div>
         <div style="display:flex;align-items:center;gap:6px;"><span class="thinking-toggle" id="${id}-toggle"></span></div>
       </div>
       <div class="thinking-content" id="${id}"><div class="thinking-content-inner">${mdToHtml(contentMarkdown)}</div></div>
@@ -865,7 +866,7 @@ function _setThinkingExpanded(content, toggle, header, expanded) {
   const label_el = header?.querySelector('.thinking-header-left span');
   if (label_el) {
     const label = label_el.dataset.label || 'thinking process';
-    label_el.textContent = expanded ? `Hide ${label}` : `View ${label}`;
+    label_el.textContent = expanded ? t('markdown.hide') + ' ' + label : t('markdown.view') + ' ' + label;
   }
 }
 
@@ -937,9 +938,9 @@ document.addEventListener('click', function(e) {
 function _endpointNameFromUrl(url) {
   try {
     const parsed = new URL(url, window.location.origin);
-    return parsed.host || parsed.hostname || 'Model endpoint';
+    return parsed.host || parsed.hostname || t('markdown.model_endpoint');
   } catch (_) {
-    return 'Model endpoint';
+    return t('markdown.model_endpoint');
   }
 }
 
@@ -959,8 +960,8 @@ function _appendEndpointAddButtons(root) {
     btn.type = 'button';
     btn.className = 'model-endpoint-add-btn';
     btn.dataset.endpointUrl = new URL(href, window.location.origin).href.replace(/\/+$/, '');
-    btn.title = 'Add this OpenAI-compatible endpoint to the model picker';
-    btn.innerHTML = '<span aria-hidden="true">+</span><span>Add to model picker</span>';
+    btn.title = t('markdown.add_endpoint_title');
+    btn.innerHTML = '<span aria-hidden="true">+</span><span>' + t('markdown.add_to_picker') + '</span>';
     anchor.insertAdjacentElement('afterend', btn);
   }
 }
@@ -970,7 +971,7 @@ async function _registerEndpointFromButton(btn) {
   if (!baseUrl || !_isModelEndpointUrl(baseUrl)) return;
   const original = btn.innerHTML;
   btn.disabled = true;
-  btn.innerHTML = '<span aria-hidden="true">...</span><span>Adding</span>';
+  btn.innerHTML = '<span aria-hidden="true">...</span><span>' + t('markdown.adding') + '</span>';
   try {
     const existingRes = await fetch('/api/model-endpoints', { credentials: 'same-origin' });
     if (existingRes.ok) {
@@ -980,11 +981,11 @@ async function _registerEndpointFromButton(btn) {
         : null;
       if (existing) {
         btn.classList.add('added');
-        btn.innerHTML = '<span aria-hidden="true">✓</span><span>Already added</span>';
+        btn.innerHTML = '<span aria-hidden="true">✓</span><span>' + t('markdown.already_added') + '</span>';
         window.dispatchEvent(new CustomEvent('ge:model-endpoints-updated', { detail: { baseUrl } }));
         if (window.modelsModule?.refreshModels) window.modelsModule.refreshModels(true);
         if (window.sessionModule?.updateModelPicker) window.sessionModule.updateModelPicker();
-        uiModule.showToast?.(`Already in model picker: ${existing.name || _endpointNameFromUrl(baseUrl)}`);
+        uiModule.showToast?.(t('markdown.already_in_picker', { name: existing.name || _endpointNameFromUrl(baseUrl) }));
         return;
       }
     }
@@ -1009,15 +1010,15 @@ async function _registerEndpointFromButton(btn) {
       throw new Error(`HTTP ${res.status}${body ? ': ' + body.slice(0, 160) : ''}`);
     }
     btn.classList.add('added');
-    btn.innerHTML = '<span aria-hidden="true">✓</span><span>Added</span>';
+    btn.innerHTML = '<span aria-hidden="true">✓</span><span>' + t('markdown.added') + '</span>';
     window.dispatchEvent(new CustomEvent('ge:model-endpoints-updated', { detail: { baseUrl } }));
     if (window.modelsModule?.refreshModels) await window.modelsModule.refreshModels(true);
     if (window.sessionModule?.updateModelPicker) window.sessionModule.updateModelPicker();
-    uiModule.showToast?.(`Model endpoint added: ${_endpointNameFromUrl(baseUrl)}`);
+    uiModule.showToast?.(t('markdown.endpoint_added', { name: _endpointNameFromUrl(baseUrl) }));
   } catch (err) {
     btn.disabled = false;
     btn.innerHTML = original;
-    uiModule.showError?.(`Add endpoint failed: ${err.message || err}`);
+    uiModule.showError?.(t('markdown.add_endpoint_failed', { msg: err.message || err }));
   }
 }
 
