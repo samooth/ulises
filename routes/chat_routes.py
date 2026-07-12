@@ -770,7 +770,6 @@ def setup_chat_routes(
         if (
             allow_web_search is not None
             and str(allow_web_search).lower() != "true"
-            and not _explicit_web_intent
         ):
             disabled_tools.add("web_search")
             disabled_tools.add("web_fetch")
