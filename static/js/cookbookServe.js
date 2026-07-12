@@ -1183,11 +1183,13 @@ function _rerenderCachedModels() {
       if (_replaceTaskId) {
         panelHtml += `<input type="hidden" class="hwfit-sf" data-field="_replaceTaskId" value="${esc(_replaceTaskId)}" />`;
       }
-      // Runtime-readiness note pinned at the top of the serve area so the
-      // user sees "vLLM ready on …" before scrolling into the configure
-      // form. Hidden until the readiness probe returns. The × button
-      // dismisses it for this panel only (re-shows on re-expand).
-      panelHtml += `<div class="hwfit-serve-runtime-note" style="display:none;font-size:11px;line-height:1.35;color:var(--fg-muted);margin:0 0 8px;padding:6px 28px 6px 10px;border-radius:5px;background:color-mix(in srgb, var(--fg) 4%, transparent);border:1px solid color-mix(in srgb, var(--border) 60%, transparent);position:relative;"><span class="hwfit-serve-runtime-text"></span><button type="button" class="hwfit-serve-runtime-close" title="Dismiss" aria-label="Dismiss" style="position:absolute;top:-8px;right:5px;background:none;border:0;color:inherit;cursor:pointer;padding:2px 4px;line-height:1;font-size:13px;opacity:0.6;"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></div>`;
+      // Runtime-readiness note shares the top line with the preset controls
+      // so "vLLM ready on …" reads as panel status instead of a separate
+      // block pushing the form down. Hidden until the readiness probe returns.
+      panelHtml += `<div class="hwfit-serve-topline">`;
+      panelHtml += `<div class="hwfit-serve-runtime-note" style="display:none;font-size:11px;line-height:1.35;color:var(--fg-muted);margin:0;padding:6px 28px 6px 10px;border-radius:5px;background:color-mix(in srgb, var(--fg) 4%, transparent);border:1px solid color-mix(in srgb, var(--border) 60%, transparent);position:relative;"><span class="hwfit-serve-runtime-text"></span><button type="button" class="hwfit-serve-runtime-close" title="Dismiss" aria-label="Dismiss" style="position:absolute;top:-8px;right:5px;background:none;border:0;color:inherit;cursor:pointer;padding:2px 4px;line-height:1;font-size:13px;opacity:0.6;"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></div>`;
+      panelHtml += `<div class="hwfit-serve-preset-row">${_slotsHtml}</div>`;
+      panelHtml += `</div>`;
       // Warn when serving a model whose download hasn't fully completed —
       // the user CAN still hit Launch (vLLM/llama-server will start, then
       // crash trying to read missing shards), but they should know.
@@ -1197,7 +1199,6 @@ function _rerenderCachedModels() {
           : `This model's download isn't complete yet (${esc(m.size || 'partial')}). The serve will start but is likely to crash on a missing shard. Wait for the download to finish, or relaunch after it's done.`;
         panelHtml += `<div class="hwfit-serve-warn" style="margin:0 0 8px;padding:6px 10px;border-radius:5px;font-size:11px;background:color-mix(in srgb, var(--color-warning, #f0ad4e) 14%, transparent);border:1px solid color-mix(in srgb, var(--color-warning, #f0ad4e) 40%, transparent);color:var(--color-warning, #f0ad4e);display:flex;gap:6px;align-items:flex-start;line-height:1.4;"><span aria-hidden="true">⚠</span><span>${_warnText}</span></div>`;
       }
-      panelHtml += `<div class="hwfit-serve-preset-row">${_slotsHtml}</div>`;
       // Row 1: Engine + Server + Env
       panelHtml += `<div class="hwfit-serve-row">`;
       const backendOpts = _backendChoices.map(([v,l]) => `<option value="${v}"${defaultBackend===v?' selected':''}>${l}</option>`).join('');
@@ -1207,7 +1208,7 @@ function _rerenderCachedModels() {
       // stays as the source-of-truth so every existing change handler
       // (updateBackendVisibility, runtime readiness, command builder)
       // still fires via dispatchEvent('change') on selection.
-      panelHtml += `<label>${_l('Engine','Inference engine: vLLM, SGLang, llama.cpp, Ollama, or Diffusers')}<div class="hwfit-backend-picker" data-backend-picker style="position:relative;width:100%;"><select class="hwfit-sf hwfit-backend-source" data-field="backend" style="display:none;">${backendOpts}</select><button type="button" class="hwfit-backend-btn" data-backend-btn aria-haspopup="listbox" aria-expanded="false" style="display:flex;align-items:center;gap:6px;width:100%;height:28px;padding:0 8px;background:var(--bg);color:var(--fg);border:1px solid var(--border);border-radius:4px;font:inherit;font-size:11px;cursor:pointer;text-align:left;position:relative;top:-3px;"><span class="hwfit-backend-btn-icon" data-backend-icon-slot aria-hidden="true" style="display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;color:var(--accent, var(--red));flex-shrink:0;"></span><span class="hwfit-backend-btn-label" data-backend-label style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"></span><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="opacity:0.6;flex-shrink:0;"><polyline points="6 9 12 15 18 9"/></svg></button><div class="hwfit-backend-menu" data-backend-menu role="listbox" hidden style="position:absolute;top:calc(100% + 4px);left:0;right:0;z-index:100;background:var(--panel, var(--bg));border:1px solid var(--border);border-radius:6px;box-shadow:0 6px 20px rgba(0,0,0,0.22);padding:4px;"></div></div></label>`;
+      panelHtml += `<label>${_l('Engine','Inference engine: vLLM, SGLang, llama.cpp, Ollama, or Diffusers')}<div class="hwfit-backend-picker" data-backend-picker style="position:relative;width:100%;"><select class="hwfit-sf hwfit-backend-source" data-field="backend" style="display:none;">${backendOpts}</select><button type="button" class="hwfit-backend-btn" data-backend-btn aria-haspopup="listbox" aria-expanded="false" style="display:flex;align-items:center;gap:6px;width:100%;height:32px;padding:0 8px;background:var(--bg);color:var(--fg);border:1px solid var(--border);border-radius:4px;font:inherit;font-size:11px;cursor:pointer;text-align:left;position:relative;top:-3px;"><span class="hwfit-backend-btn-icon" data-backend-icon-slot aria-hidden="true" style="display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;color:var(--accent, var(--red));flex-shrink:0;"></span><span class="hwfit-backend-btn-label" data-backend-label style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"></span><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="opacity:0.6;flex-shrink:0;"><polyline points="6 9 12 15 18 9"/></svg></button><div class="hwfit-backend-menu" data-backend-menu role="listbox" hidden style="position:absolute;top:calc(100% + 4px);left:0;right:0;z-index:100;background:var(--panel, var(--bg));border:1px solid var(--border);border-radius:6px;box-shadow:0 6px 20px rgba(0,0,0,0.22);padding:4px;"></div></div></label>`;
       panelHtml += `<input type="hidden" class="hwfit-sf" data-field="host" value="${esc(_es.remoteHost || '')}" />`;
       // Inference mode pill (llama.cpp only) — lives directly to the
       // RIGHT of Backend in Row 1 so the engine and the GPU/CPU choice
@@ -1231,7 +1232,7 @@ function _rerenderCachedModels() {
         const _savedUnified = !!sv('unified_mem', false);
         const _llamaModeRaw = sv('llama_mode', _llamaModeDefault);
         const _llamaMode = _savedUnified && _llamaModeRaw !== 'cpu' ? 'unified' : _llamaModeRaw;
-        panelHtml += `<label class="hwfit-backend-llamacpp">${_l('Inference','CPU = -ngl 0. GPU = -ngl 99. Unified = GPU offload plus GGML_CUDA_ENABLE_UNIFIED_MEMORY=1 for unified-memory CUDA systems.')}<div class="mode-toggle mode-toggle-three${_llamaMode === 'gpu' ? ' mode-mid' : (_llamaMode === 'unified' ? ' mode-third' : '')}" data-llama-mode-toggle style="display:flex;width:100%;height:30px;position:relative;top:2px;"><button type="button" class="mode-toggle-btn${_llamaMode === 'cpu' ? ' active' : ''}" data-llama-mode="cpu" aria-pressed="${_llamaMode === 'cpu'}" style="flex:1;"><span style="position:relative;top:-7px;">CPU</span></button><button type="button" class="mode-toggle-btn${_llamaMode === 'gpu' ? ' active' : ''}" data-llama-mode="gpu" aria-pressed="${_llamaMode === 'gpu'}" style="flex:1;"><span style="position:relative;top:-7px;">GPU</span></button><button type="button" class="mode-toggle-btn${_llamaMode === 'unified' ? ' active' : ''}" data-llama-mode="unified" aria-pressed="${_llamaMode === 'unified'}" style="flex:1;"><span style="position:relative;top:-7px;">Unified</span></button></div><input type="hidden" class="hwfit-sf" data-field="llama_mode" value="${esc(_llamaMode)}" /><input type="hidden" class="hwfit-sf" data-field="unified_mem" value="${_llamaMode === 'unified' ? '1' : ''}" /></label>`;
+        panelHtml += `<label class="hwfit-backend-llamacpp">${_l('Inference','CPU = -ngl 0. GPU = -ngl 99. Unified = GPU offload plus GGML_CUDA_ENABLE_UNIFIED_MEMORY=1 for unified-memory CUDA systems.')}<div class="mode-toggle mode-toggle-three${_llamaMode === 'gpu' ? ' mode-mid' : (_llamaMode === 'unified' ? ' mode-third' : '')}" data-llama-mode-toggle style="display:flex;width:100%;height:32px;position:relative;top:2px;"><button type="button" class="mode-toggle-btn${_llamaMode === 'cpu' ? ' active' : ''}" data-llama-mode="cpu" aria-pressed="${_llamaMode === 'cpu'}" style="flex:1;"><span style="position:relative;top:-7px;">CPU</span></button><button type="button" class="mode-toggle-btn${_llamaMode === 'gpu' ? ' active' : ''}" data-llama-mode="gpu" aria-pressed="${_llamaMode === 'gpu'}" style="flex:1;"><span style="position:relative;top:-7px;">GPU</span></button><button type="button" class="mode-toggle-btn${_llamaMode === 'unified' ? ' active' : ''}" data-llama-mode="unified" aria-pressed="${_llamaMode === 'unified'}" style="flex:1;"><span style="position:relative;top:-7px;">Unified</span></button></div><input type="hidden" class="hwfit-sf" data-field="llama_mode" value="${esc(_llamaMode)}" /><input type="hidden" class="hwfit-sf" data-field="unified_mem" value="${_llamaMode === 'unified' ? '1' : ''}" /></label>`;
       }
       panelHtml += `<label>${_l('venv','Path to Python venv or conda env activate script')}<input type="text" class="hwfit-sf hwfit-sf-wide" data-field="venv" value="${esc(sv('venv', _es.envPath || _srvVenv || ''))}" placeholder="~/venv" /></label>`;
       const defaultPort = defaultBackend === 'ollama' ? '11434' : _nextAvailablePort();
@@ -1332,10 +1333,9 @@ function _rerenderCachedModels() {
       // tuning, or any other KEY=VALUE pair that doesn't have a dedicated
       // field. After the venv activate runs, $VIRTUAL_ENV / $PATH / etc. are
       // already exported so they expand correctly here.
-      // grid-column: 1 / -1 makes Env span every column of the Advanced
-      // row's CSS grid (the old flex:1 1 100% did nothing in a grid
-      // container — left an empty trailing column gap on wide modals).
-      panelHtml += `<label class="hwfit-backend-vllm hwfit-backend-sglang" style="grid-column:2 / -1;">${_l('Env','Extra KEY=VALUE env-var pairs prepended to the launch (space-separated). The Env Preset above covers the usual MiniMax M3 values; use this for additional overrides.')}<input type="text" class="hwfit-sf" data-field="extra_env" value="${esc(svm('extra_env', sv('extra_env','')))}" placeholder="NCCL_P2P_DISABLE=1" style="width:100%;" /></label>`;
+      // CSS places this beside vLLM's Env Preset, but lets it span the full
+      // row for SGLang where that preset field is hidden.
+      panelHtml += `<label class="hwfit-backend-vllm hwfit-backend-sglang hwfit-extra-env-label">${_l('Env','Extra KEY=VALUE env-var pairs prepended to the launch (space-separated). The Env Preset above covers the usual MiniMax M3 values; use this for additional overrides.')}<input type="text" class="hwfit-sf" data-field="extra_env" value="${esc(svm('extra_env', sv('extra_env','')))}" placeholder="NCCL_P2P_DISABLE=1" style="width:100%;" /></label>`;
       panelHtml += `</div>`;
       // Row 2b: Diffusers settings
       const diffDtypeOpts = ['bfloat16','float16','float32'].map(d => `<option value="${d}"${sv('diff_dtype','bfloat16')===d?' selected':''}>${d}</option>`).join('');
@@ -1886,6 +1886,7 @@ function _rerenderCachedModels() {
 
       function updateBackendVisibility() {
         const b = panel.querySelector('[data-field="backend"]')?.value || 'vllm';
+        panel.dataset.backendActive = b;
         panel.querySelectorAll('[class*="hwfit-backend-"]').forEach(el => {
           // Skip the entire backend-picker subtree — the picker's own
           // classes (`hwfit-backend-picker`, `-btn`, `-menu`, `-item`,
