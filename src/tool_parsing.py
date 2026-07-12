@@ -114,6 +114,13 @@ _TOOL_CODE_RE = re.compile(
 _TOOL_CODE_OPEN_RE = re.compile(r"<tool_code>\s*\{", re.IGNORECASE)
 _TOOL_CODE_CLOSE_RE = re.compile(r"\}\s*</tool_code>", re.IGNORECASE)
 
+# Pattern 4b: Gemma-style <|tool_call|> call:tool_name{args} <tool_call|>
+_GEMMA_TOOL_CALL_RE = re.compile(
+    r"<\|?tool_call\|?>\s*call:([\w\d_-]+)\s*(\{[\s\S]*?\})\s*<\|?tool_call\|?>",
+    re.IGNORECASE,
+)
+
+
 # Pattern 5: DeepSeek DSML markup leaking into content. When deepseek
 # models can't emit structured tool_calls (e.g. we sent no tool schemas
 # that round, or the API didn't parse them), they fall back to raw
@@ -346,6 +353,88 @@ def _parse_misfenced_web_lookup(content: str) -> Optional[ToolBlock]:
     if not url:
         return None
     return ToolBlock("web_fetch", url)
+
+
+
+def _parse_misfenced_read_file_lookup(content: str, *, allow_shell_style: bool = False) -> Optional[ToolBlock]:
+    """Recover simple read_file calls wrapped in python/bash fences."""
+    stripped = content.strip()
+    if not stripped:
+        return None
+
+    try:
+        module = ast.parse(stripped, mode="exec")
+    except SyntaxError:
+        module = None
+    if module and len(module.body) == 1 and isinstance(module.body[0], ast.Expr):
+        call = module.body[0].value
+        if isinstance(call, ast.Call) and isinstance(call.func, ast.Name):
+            if call.func.id.lower() != "read_file" or len(call.args) > 1:
+                return None
+            args = {}
+            if call.args:
+                path = _literal_string(call.args[0])
+                if not path:
+                    return None
+                args["path"] = path
+            allowed = {"path", "file", "file_path", "offset", "limit"}
+            for keyword in call.keywords:
+                if keyword.arg not in allowed:
+                    return None
+                key = "path" if keyword.arg in ("file", "file_path") else keyword.arg
+                if key == "path":
+                    path = _literal_string(keyword.value)
+                    if not path:
+                        return None
+                    args["path"] = path
+                    continue
+                try:
+                    value = ast.literal_eval(keyword.value)
+                except (ValueError, SyntaxError, TypeError):
+                    return None
+                if not isinstance(value, int) or value < 0:
+                    return None
+                args[key] = value
+            if not args.get("path"):
+                return None
+            from src.tool_schemas import function_call_to_tool_block
+            return function_call_to_tool_block("read_file", json.dumps(args))
+
+    if not allow_shell_style:
+        return None
+    lines = [line.strip() for line in stripped.splitlines() if line.strip()]
+    if len(lines) != 1:
+        return None
+    match = re.fullmatch(r"read_file\s+(.+)", lines[0], re.IGNORECASE)
+    if not match:
+        return None
+    path = match.group(1).strip()
+    if not path:
+        return None
+    if path.startswith("{"):
+        try:
+            args = json.loads(path)
+        except json.JSONDecodeError:
+            return None
+        if not isinstance(args, dict):
+            return None
+        normalized = {}
+        raw_path = args.get("path") or args.get("file") or args.get("file_path")
+        if isinstance(raw_path, str) and raw_path.strip():
+            normalized["path"] = raw_path.strip()
+        for key in ("offset", "limit"):
+            value = args.get(key)
+            if isinstance(value, int) and value >= 0:
+                normalized[key] = value
+        if not normalized.get("path"):
+            return None
+        from src.tool_schemas import function_call_to_tool_block
+        return function_call_to_tool_block("read_file", json.dumps(normalized))
+    if len(path) >= 2 and path[0] == path[-1] and path[0] in "'\"":
+        path = path[1:-1].strip()
+    if not path:
+        return None
+    return ToolBlock("read_file", path)
 
 
 def _coerce_raw_web_query(value) -> Optional[str]:
@@ -698,6 +787,40 @@ def _parse_tool_code_block(raw: str) -> Optional[ToolBlock]:
         return ToolBlock(tool_name, content.strip())
     return None
 
+def _parse_gemma_tool_call(tool_name: str, body: str) -> Optional[ToolBlock]:
+    """Parse a Gemma-style call:tool_name{...} block into a ToolBlock."""
+    tool_name = tool_name.strip().lower().replace("-", "_")
+    body = body.strip()
+    if not body:
+        return None
+
+    # Replace custom Gemma string delimiters with standard quotes
+    body = body.replace('<|"|>', '"').replace('<|"', '"').replace('"|>', '"')
+
+    # Try standard JSON parsing
+    params = {}
+    try:
+        params = json.loads(body)
+        if not isinstance(params, dict):
+            params = {}
+    except json.JSONDecodeError:
+        # Try unquoted keys repair: e.g. {query: "..."} -> {"query": "..."}
+        try:
+            repaired = re.sub(r'([{,]\s*)(\w+)\s*:', r'\1"\2":', body)
+            params = json.loads(repaired)
+            if not isinstance(params, dict):
+                params = {}
+        except Exception:
+            # Simple regex key-value extraction fallback
+            params = {}
+            for m in re.finditer(r'(\w+)\s*:\s*["\']?(.*?)["\']?(?=\s*,\s*\w+\s*:|\s*\})', body):
+                k = m.group(1)
+                v = m.group(2).strip()
+                params[k] = v
+
+    from src.tool_schemas import function_call_to_tool_block
+    return function_call_to_tool_block(tool_name, json.dumps(params))
+
 
 def _iter_delimited(text, open_re, close_re):
     """Yield ``(match_start, inner_start, inner_end, match_end)`` for each
@@ -858,7 +981,8 @@ def parse_tool_blocks(text: str, skip_fenced: bool = False) -> List[ToolBlock]:
                 # _XML_INVOKE_RE's \w+ can't match would otherwise be executed as code.
                 continue
             if tag in ("python", "bash"):
-                block = _parse_misfenced_web_lookup(content)
+                block = (_parse_misfenced_web_lookup(content)
+                         or _parse_misfenced_read_file_lookup(content, allow_shell_style=(tag == "bash")))
                 if block:
                     blocks.append(block)
                     continue
@@ -929,6 +1053,15 @@ def parse_tool_blocks(text: str, skip_fenced: bool = False) -> List[ToolBlock]:
             if block:
                 blocks.append(block)
 
+    # Pattern 4b: Gemma-style <|tool_call|> blocks
+    if not blocks:
+        for m in _GEMMA_TOOL_CALL_RE.finditer(text):
+            tool_name = m.group(1)
+            body = m.group(2)
+            block = _parse_gemma_tool_call(tool_name, body)
+            if block:
+                blocks.append(block)
+
     # Pattern 6: local text-model web_search call leaked as prose + bare JSON.
     if not blocks and not skip_fenced:
         raw_web_json = _parse_raw_web_json_lookup(text)
@@ -963,6 +1096,7 @@ def strip_tool_blocks(text: str, skip_fenced: bool = False) -> str:
     cleaned = _strip_delimited(cleaned, _XML_TOOL_CALL_OPEN_RE, _XML_TOOL_CALL_CLOSE_RE)
     cleaned = _XML_OPEN_TOOL_CALL_RE.sub('', cleaned)
     cleaned = _strip_delimited(cleaned, _TOOL_CODE_OPEN_RE, _TOOL_CODE_CLOSE_RE)
+    cleaned = _GEMMA_TOOL_CALL_RE.sub('', cleaned)
     if not skip_fenced:
         raw_web_json = _parse_raw_web_json_lookup(cleaned)
         if raw_web_json:
