@@ -6068,6 +6068,15 @@ async function _bulkAction(action) {
   if (cancelBtn) cancelBtn.disabled = true;
   if (selectAll) selectAll.disabled = true;
   if (countEl) countEl.textContent = `${verbing} ${uids.length}…`;
+  const deleteOverlays = action === 'delete'
+    ? uids.map(uid => {
+        const card = document.querySelector(`#email-lib-grid .doclib-card[data-uid="${CSS.escape(String(uid))}"]`);
+        return _showEmailDeleteOverlay(card);
+      }).filter(Boolean)
+    : [];
+  if (deleteOverlays.length) {
+    await Promise.all(deleteOverlays.map(busy => busy.ready).filter(Boolean));
+  }
 
   // Single-uid worker.
   const handleOne = async (uid) => {
@@ -6130,6 +6139,9 @@ async function _bulkAction(action) {
     });
 
     if (action === 'archive' || action === 'delete') {
+      if (action === 'delete') {
+        deleteOverlays.forEach(busy => busy.remove?.());
+      }
       await _animateEmailCardRemoval(uids);
       const removed = new Set(uids.map(uid => String(uid)));
       state._libEmails = state._libEmails.filter(e => !removed.has(String(e.uid)));
@@ -6143,6 +6155,7 @@ async function _bulkAction(action) {
       state._libEmails = state._libEmails.filter(e => !removed.has(String(e.uid)));
     }
   } finally {
+    deleteOverlays.forEach(busy => busy.remove?.());
     if (busySpinner) busySpinner.destroy();
     // Restore whichever button we hijacked (delete vs actions).
     if (targetBtn) {

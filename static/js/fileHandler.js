@@ -16,6 +16,9 @@ let uploaded = [];
 let _lastUploadedMeta = [];
 let API_BASE = '';
 let _uploadSpinners = [];
+let _uploadAbortCtrl = null;
+let _uploading = false;
+let _lastUploadCancelled = false;
 const _previewUrls = new WeakMap();
 
 const MAX_FILES = 10;
@@ -131,6 +134,7 @@ function _createChip(f, idx) {
  * Remove a pending file by index
  */
 export function removePending(idx) {
+  if (_uploading) cancelUpload();
   _revokePreviewUrl(pendingFiles[idx]);
   pendingFiles.splice(idx, 1);
   renderAttachStrip();
@@ -141,6 +145,7 @@ export function removePending(idx) {
  */
 export async function uploadPending() {
   if (pendingFiles.length === 0) return [];
+  _lastUploadCancelled = false;
 
   // The message bubble is shown immediately, but the upload can take a moment —
   // dim the chips and overlay a whirlpool so it's clear the files are still
@@ -165,11 +170,19 @@ export async function uploadPending() {
 
   const fd = new FormData();
   pendingFiles.forEach(f => fd.append('files', f, f.name || 'paste.png'));
+  _uploadAbortCtrl = new AbortController();
+  _uploading = true;
+  const timeoutId = setTimeout(() => {
+    if (_uploadAbortCtrl && !_uploadAbortCtrl.signal.aborted) {
+      try { _uploadAbortCtrl.abort(); } catch (_) {}
+    }
+  }, 120000);
 
   try {
     const res = await fetch(`${API_BASE}/api/upload`, {
       method: 'POST',
-      body: fd
+      body: fd,
+      signal: _uploadAbortCtrl.signal,
     });
     if (!res.ok) {
       // Surface the failure instead of swallowing it. Previously a non-OK
@@ -184,13 +197,28 @@ export async function uploadPending() {
     }
     const data = await res.json();
     uploaded = (data.files || []);
+    if (uploaded.some(x => x && x.gallery_id)) {
+      try { localStorage.setItem('gallery-fresh-chat-upload', String(Date.now())); } catch (_) {}
+      window.dispatchEvent(new CustomEvent('gallery-refresh', { detail: { source: 'chat-upload' } }));
+    }
     pendingFiles = [];          // clear only on success
     // Stash the full meta (incl. width/height for images) on the module so
     // callers that want it can grab it via getLastUploadedMeta(). Keep the
     // returned shape as `ids` for backward-compatibility with existing call sites.
     _lastUploadedMeta = uploaded;
     return uploaded.map(x => x.id);
+  } catch (e) {
+    if (e && e.name === 'AbortError') {
+      _lastUploadCancelled = true;
+      _showToast('Upload cancelled');
+      return [];
+    }
+    _showToast('Upload failed: ' + (e?.message || 'network error'));
+    return [];
   } finally {
+    clearTimeout(timeoutId);
+    _uploading = false;
+    _uploadAbortCtrl = null;
     _uploadSpinners.forEach(sp => { try { sp.stop && sp.stop(); } catch (_) {} });
     _uploadSpinners = [];
     if (strip) strip.classList.remove('attach-uploading');
@@ -263,6 +291,7 @@ export function getPendingInfo() {
  * Clear all pending files
  */
 export function clearPending() {
+  if (_uploading) cancelUpload();
   pendingFiles.forEach(_revokePreviewUrl);
   pendingFiles = [];
   renderAttachStrip();
@@ -271,6 +300,21 @@ export function clearPending() {
 /** Full meta (incl. width/height for images) from the most recent uploadPending(). */
 export function getLastUploadedMeta() {
   return _lastUploadedMeta;
+}
+
+export function isUploading() {
+  return _uploading;
+}
+
+export function wasLastUploadCancelled() {
+  return _lastUploadCancelled;
+}
+
+export function cancelUpload() {
+  _lastUploadCancelled = true;
+  if (_uploadAbortCtrl && !_uploadAbortCtrl.signal.aborted) {
+    try { _uploadAbortCtrl.abort(); } catch (_) {}
+  }
 }
 
 var escapeHtml = uiModule.esc;
@@ -287,6 +331,9 @@ const fileHandlerModule = {
   getPendingRaw,
   clearPending,
   getLastUploadedMeta,
+  isUploading,
+  wasLastUploadCancelled,
+  cancelUpload,
 };
 
 export default fileHandlerModule;
