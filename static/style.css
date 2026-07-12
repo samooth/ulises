@@ -19902,7 +19902,7 @@ body.gallery-selecting .gallery-dl-btn,
 .hwfit-serve-preset-row {
   display: flex;
   justify-content: flex-end;
-  margin: 0;
+  margin: 4px 0 6px;
   flex: 0 0 auto;
 }
 /* Expanded serve panel — make sure it can be scrolled past when it
@@ -19920,7 +19920,7 @@ body.gallery-selecting .gallery-dl-btn,
   }
   .hwfit-serve-preset-row {
     justify-content: flex-end;
-    margin: -2px 0 0;
+    margin: 2px 0 6px;
   }
   .hwfit-serve-topline {
     flex-wrap: wrap;
