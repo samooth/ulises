@@ -95,7 +95,13 @@ class WebFetchTool:
             return {"error": f"web_fetch: {url}: no readable text content (not HTML, or the page needs JS/login)", "exit_code": 1}
 
         header = (f"# {title}\n" if title else "") + f"Source: {url}\n\n"
-        output = header + text
+        partial = ""
+        if result.get("truncated"):
+            fb = result.get("fetched_bytes", 0)
+            tb = result.get("total_bytes") or 0
+            suffix = f" / {tb} bytes" if tb else " bytes"
+            partial = f"[partial content: {fb}{suffix}; call with {{\"url\": \"{url}\", \"full\": true}} for the rest]\n\n"
+        output = partial + header + text
         if len(output) > MAX_OUTPUT_CHARS:
             output = output[:MAX_OUTPUT_CHARS] + "\n\n[...truncated]"
         return {"output": output, "exit_code": 0}
