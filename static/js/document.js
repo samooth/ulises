@@ -17,7 +17,6 @@ import { openLibrary, closeLibrary, isLibraryOpen, initLibrary } from './documen
 import signatureModule from './signature.js';
 import * as Modals from './modalManager.js';
 import { t } from './i18n.js';
-import { t } from './i18n.js';
 
   let API_BASE = '';
   let isOpen = false;

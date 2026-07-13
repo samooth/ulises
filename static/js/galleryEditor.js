@@ -109,7 +109,6 @@ import { wireTopbarOverflow } from './editor/wire-topbar-overflow.js';
 import { wireTopbarMenus } from './editor/wire-topbar-menus.js';
 import { API_BASE } from './apiBase.js';
 import { t } from './i18n.js';
-import { t } from './i18n.js';
 // ── State ──
 // Transform-overlay canvas — sits over the main canvas with extra margin
 // so resize / rotation handles render OUTSIDE the image edges. Pointer

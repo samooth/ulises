@@ -13,7 +13,6 @@ import { applyEdgeDock, clearDockSide } from './modalSnap.js';
 import { topToolWindowZ } from './toolWindowZOrder.js';
 import { API_BASE } from './apiBase.js';
 import { t } from './i18n.js';
-import { t } from './i18n.js';
 let _open = false;
 let _notes = [];
 let _editingId = null;

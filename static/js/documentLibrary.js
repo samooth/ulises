@@ -12,7 +12,6 @@ import { makeWindowDraggable } from './windowDrag.js';
 import { langIcon } from './langIcons.js';
 import { registerMenuDismiss, dismissOrRemove } from './escMenuStack.js';
 import { t } from './i18n.js';
-import { t } from './i18n.js';
 
 // ── Injected references from documentModule ──
 let API_BASE = '';

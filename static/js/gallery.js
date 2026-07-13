@@ -8,7 +8,6 @@ import spinnerModule from './spinner.js';
 import { makeWindowDraggable } from './windowDrag.js';
 import { API_BASE } from './apiBase.js';
 import { t } from './i18n.js';
-import { t } from './i18n.js';
 let _open = false;
 let _galleryResizeHandler = null;
 
