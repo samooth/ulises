@@ -19,15 +19,33 @@ def format_byte_limit(limit: int) -> str:
 
 
 def read_byte_limit_env(name: str, default: int) -> int:
-    raw = os.getenv(name)
-    if raw is None or not raw.strip():
+    """
+    Read an integer byte-limit from env.
+
+    Supports legacy ODYSSEUS_* env var names for backward compatibility:
+    If `name` starts with "ULISES_", we check "ODYSSEUS_..." first, then the
+    original "ULISES_...". If neither is set we return default.
+    """
+    candidates = [name]
+    if name.startswith("ULISES_"):
+        candidates.insert(0, name.replace("ULISES_", "ODYSSEUS_", 1))
+
+    raw = None
+    for n in candidates:
+        v = os.getenv(n)
+        if v is not None and v.strip():
+            raw = v
+            break
+
+    if raw is None:
         return default
+
     try:
         limit = int(raw)
     except ValueError as exc:
-        raise ValueError(f"{name} must be an integer byte count") from exc
+        raise ValueError(f"{n} must be an integer byte count") from exc
     if limit < 1:
-        raise ValueError(f"{name} must be greater than 0")
+        raise ValueError(f"{n} must be greater than 0")
     return limit
 
 
