@@ -777,7 +777,7 @@ async def execute_tool_block(
     elif tool == "get_workspace":
         desc = "get_workspace"
         if workspace:
-            result = {"output": f"Active workspace: {workspace} (not sandboxed)", "exit_code": 0}
+            result = {"output": f"{workspace} (not sandboxed)", "exit_code": 0}
         else:
             result = {"output": "No workspace is active.", "exit_code": 0}
     elif tool == "edit_file":

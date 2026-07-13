@@ -2,7 +2,7 @@ import asyncio
 import json
 from typing import Dict, Any
 
-from src.constants import MAX_OUTPUT_CHARS
+from src.constants import MAX_OUTPUT_CHARS, WEB_FETCH_HARD_MAX_BYTES
 
 class WebSearchTool:
     async def execute(self, content: str, ctx: dict) -> dict:
@@ -59,11 +59,13 @@ class WebFetchTool:
         from src.search.content import fetch_webpage_content
         raw = content.strip()
         url = ""
+        full = False
         if raw.startswith("{"):
             try:
                 parsed = json.loads(raw)
                 if isinstance(parsed, dict):
                     url = str(parsed.get("url") or "").strip()
+                    full = bool(parsed.get("full", False))
             except json.JSONDecodeError:
                 url = ""
         if not url:
@@ -76,9 +78,10 @@ class WebFetchTool:
         if not low.startswith(("http://", "https://")):
             url = "https://" + url
         loop = asyncio.get_running_loop()
+        max_bytes = WEB_FETCH_HARD_MAX_BYTES if full else None
         try:
             result = await asyncio.wait_for(
-                loop.run_in_executor(None, lambda: fetch_webpage_content(url, timeout=10)),
+                loop.run_in_executor(None, lambda: fetch_webpage_content(url, timeout=10, max_bytes=max_bytes)),
                 timeout=30,
             )
         except asyncio.TimeoutError:

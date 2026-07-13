@@ -302,7 +302,11 @@ class GlobTool:
             matched = []
             try:
                 for p in base.rglob(pattern):
-                    if set(p.relative_to(base).parts) & _CODENAV_SKIP_DIRS:
+                    try:
+                        parts = p.relative_to(base).parts
+                    except ValueError:
+                        continue
+                    if set(parts) & _CODENAV_SKIP_DIRS:
                         continue
                     real_path = _os.path.realpath(str(p))
                     if workspace and not real_path.startswith(real_base + _os.sep) and real_path != real_base:
@@ -316,7 +320,7 @@ class GlobTool:
                     matched.append((mtime, str(p)))
                     if len(matched) > _CODENAV_MAX_HITS * 5:
                         break
-            except (OSError, ValueError) as _e:
+            except OSError as _e:
                 return None, f"glob: {_e}"
             matched.sort(key=lambda t: t[0], reverse=True)
             return [pth for _, pth in matched[:_CODENAV_MAX_HITS]], None
