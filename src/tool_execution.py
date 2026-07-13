@@ -48,6 +48,25 @@ def agent_cwd() -> str:
     return ws if ws is not None else _AGENT_WORKDIR
 
 
+def vet_workspace(raw: str) -> Optional[str]:
+    """Validate a requested workspace path at bind time.
+
+    Returns the canonical path, or None when it is unusable: not a real
+    directory, or itself a sensitive path (.ssh, .gnupg, ...). The in-workspace
+    resolver deny-lists sensitive paths *inside* the workspace, but the
+    empty-path search root is the workspace itself, so the root has to be
+    vetted before it is ever bound.
+    """
+    raw = (raw or "").strip()
+    if not raw:
+        return None
+    resolved = os.path.realpath(os.path.expanduser(raw))
+    if not os.path.isdir(resolved) or _is_sensitive_path(resolved):
+        return None
+    if os.path.dirname(resolved) == resolved:
+        return None
+    return resolved
+
 
 # ---------------------------------------------------------------------------
 # Path confinement for read_file / write_file
