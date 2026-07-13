@@ -8,7 +8,9 @@ Sub-modules:
   - tool_parsing.py: regex patterns, parse/strip functions
   - tool_schemas.py: FUNCTION_TOOL_SCHEMAS, function_call_to_tool_block
   - tool_execution.py: execute_tool_block, format_tool_result, MCP helpers
-  - tool_implementations.py: all do_* tool functions
+  - tool_implementations.py: do_* tool functions (search, skills, tasks, api)
+  - admin_tools.py: admin do_* tool functions (endpoints, mcp, webhooks, tokens, settings)
+  - document_tools.py: active document helpers
 """
 
 import logging
@@ -115,19 +117,16 @@ from src.agent_tools.document_tools import (  # noqa: E402, F401
     set_active_model,
     get_active_document,
 )
-from src.tool_implementations import (  # noqa: E402, F401
-    do_create_document,
-    do_update_document,
-    do_edit_document,
-    do_suggest_document,
-    do_search_chats,
-    do_manage_skills,
-    do_manage_tasks,
+from src.agent_tools.admin_tools import (  # noqa: E402, F401
     do_manage_endpoints,
     do_manage_mcp,
     do_manage_webhooks,
     do_manage_tokens,
-    do_manage_documents,
     do_manage_settings,
+)
+from src.tool_implementations import (  # noqa: E402, F401
+    do_search_chats,
+    do_manage_skills,
+    do_manage_tasks,
     do_api_call,
 )

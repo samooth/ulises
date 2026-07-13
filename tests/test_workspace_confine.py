@@ -20,7 +20,6 @@ import pytest
 from src.tool_execution import (
     _AGENT_WORKDIR,
     _active_workspace,
-    _resolve_search_root,
     _resolve_tool_path,
     _resolve_tool_path_in_workspace,
     agent_cwd,
