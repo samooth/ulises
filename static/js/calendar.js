@@ -2589,7 +2589,7 @@ async function _showCalSettings() {
       clearTimeout(saveTimer);
       saveTimer = setTimeout(async () => {
         await fetch(`${API_BASE}/api/calendar/calendars/${id}?name=${encodeURIComponent(nameInput.value)}&color=${encodeURIComponent(colorInput.value)}`, { method: 'PUT' });
-        if (uiModule?.showToast) uiModule.showToast(t('calendar.saved', { name: nameInput.value || t('calendar.default_name') })); “${nameInput.value || 'calendar'}”`);
+        if (uiModule?.showToast) uiModule.showToast(t('calendar.saved', { name: nameInput.value || t('calendar.default_name') }));
         // Update local calendar list
         const c = _calendars.find(c => c.href === id);
         if (c) { c.name = nameInput.value; c.color = colorInput.value; }
