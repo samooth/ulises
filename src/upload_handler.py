@@ -638,7 +638,7 @@ class UploadHandler:
         if file_size > self.max_upload_size:
             raise HTTPException(
                 status_code=400,
-                detail=t("upload.file_too_large")
+                detail=t("upload.file_too_large").format(limit=format_byte_limit(self.max_upload_size))
             )
         
         # Get original filename and sanitize it

@@ -2590,7 +2590,7 @@ async def stream_agent_loop(
         (model or "").lower().startswith("odysseus-qwen3")
         and (
             "documents" in _intent_domains
-            or _active_document_relevant
+            or _turn_targets_active_document(_intent, _last_user, active_document)
             or _prompt_active_document is not None
         )
         and "files" not in _intent_domains
@@ -2609,7 +2609,7 @@ async def stream_agent_loop(
 
     if (
         _relevant_tools is not None
-        and _active_document_relevant
+        and _turn_targets_active_document(_intent, _last_user, active_document)
         and "files" not in _intent_domains
         and not uploaded_files
         and not workspace

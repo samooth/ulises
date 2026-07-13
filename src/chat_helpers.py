@@ -217,7 +217,7 @@ def validate_file_upload(file: UploadFile) -> UploadFile:
                 status_code=400,
                 detail={
                     "error": "FILE_TOO_LARGE",
-                    "message": t("message.file_too_large").format(limit=format_byte_limit(upload_limit))
+                    "message": t("upload.file_too_large").format(limit=format_byte_limit(upload_limit))
                 }
             )
     except IOError as e:

@@ -69,6 +69,6 @@ async def read_upload_limited(upload: UploadFile, limit: int, label: str = "Uplo
     if len(data) > limit:
         raise HTTPException(
             status_code=413,
-            detail=t("upload.file_too_large"),
+            detail=t("upload.file_too_large").format(limit=format_byte_limit(limit)),
         )
     return data
