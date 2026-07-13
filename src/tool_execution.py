@@ -774,6 +774,12 @@ async def execute_tool_block(
     elif tool == "edit_image":
         desc = "edit_image"
         result = await do_edit_image(content, owner=owner)
+    elif tool == "get_workspace":
+        desc = "get_workspace"
+        if workspace:
+            result = {"output": f"Active workspace: {workspace} (not sandboxed)", "exit_code": 0}
+        else:
+            result = {"output": "No workspace is active.", "exit_code": 0}
     elif tool == "edit_file":
         result = await _direct_fallback(tool, content, workspace=workspace) or {"error": "edit failed", "exit_code": 1}
         desc = result.get("output") or result.get("error") or "edit_file"

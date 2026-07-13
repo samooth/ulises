@@ -271,6 +271,7 @@ class GlobTool:
                     _resolve_tool_path,
                     _resolve_tool_path_in_workspace,
                     _resolve_search_root,
+                    _is_sensitive_path,
                     _truncate
                 )
         workspace = ctx.get("workspace")
@@ -293,13 +294,20 @@ class GlobTool:
 
         def _glob():
             from pathlib import Path
+            import os as _os
             base = Path(root)
             if not base.is_dir():
                 return None, f"glob: {root}: not a directory"
+            real_base = _os.path.realpath(root)
             matched = []
             try:
                 for p in base.rglob(pattern):
                     if set(p.relative_to(base).parts) & _CODENAV_SKIP_DIRS:
+                        continue
+                    real_path = _os.path.realpath(str(p))
+                    if workspace and not real_path.startswith(real_base + _os.sep) and real_path != real_base:
+                        continue
+                    if _is_sensitive_path(real_path):
                         continue
                     try:
                         mtime = p.stat().st_mtime
