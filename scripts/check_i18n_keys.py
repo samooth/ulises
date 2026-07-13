@@ -95,13 +95,29 @@ def extract_code_keys():
     return py_keys, js_html_keys
 
 
+def _load_locale_dir(dir_path: Path) -> dict:
+    """Load all JSON files in a locale directory and merge."""
+    merged: dict = {}
+    if not dir_path.is_dir():
+        return merged
+    for fname in sorted(dir_path.iterdir()):
+        if not fname.name.endswith(".json"):
+            continue
+        try:
+            data = json.loads(fname.read_text(encoding="utf-8"))
+            if isinstance(data, dict):
+                merged.update(data)
+        except (OSError, json.JSONDecodeError):
+            pass
+    return merged
+
+
 def check_locale(code_keys, locale_path, label):
-    """Compare code keys against a locale file. Returns list of issue strings."""
+    """Compare code keys against a locale directory. Returns list of issue strings."""
     issues = []
-    try:
-        data = json.loads(locale_path.read_text(encoding="utf-8"))
-    except (FileNotFoundError, json.JSONDecodeError) as e:
-        issues.append(f"ERROR: Cannot load {locale_path}: {e}")
+    data = _load_locale_dir(locale_path)
+    if not data:
+        issues.append(f"ERROR: Cannot load locale from {locale_path}")
         return issues
 
     locale_keys = _leaf_keys(data)
@@ -126,11 +142,10 @@ def check_locale(code_keys, locale_path, label):
 def check_interpolation_parity(en_path, es_path, label):
     """Check that interpolation variables match between en and es."""
     issues = []
-    try:
-        en = json.loads(en_path.read_text(encoding="utf-8"))
-        es = json.loads(es_path.read_text(encoding="utf-8"))
-    except Exception as e:
-        issues.append(f"ERROR: Cannot load locale pair: {e}")
+    en = _load_locale_dir(en_path)
+    es = _load_locale_dir(es_path)
+    if not en or not es:
+        issues.append(f"ERROR: Cannot load locale pair: {en_path}, {es_path}")
         return issues
 
     def _leaf_pairs(obj, prefix=""):
@@ -192,18 +207,20 @@ def main():
     py_keys, js_html_keys = extract_code_keys()
     all_issues = []
 
-    # Frontend check: JS/HTML keys against static/locales/en.json
-    fe_en = REPO / "static" / "locales" / "en.json"
-    fe_es = REPO / "static" / "locales" / "es.json"
+    # Frontend check: JS/HTML keys against static/locales/en/
+    fe_en = REPO / "static" / "locales" / "en"
+    fe_es = REPO / "static" / "locales" / "es"
     fe_issues = check_locale(js_html_keys, fe_en, "FE")
-    es_key_count = len(_leaf_keys(json.loads(fe_es.read_text())))
-    en_key_count = len(_leaf_keys(json.loads(fe_en.read_text())))
+    fe_en_data = _load_locale_dir(fe_en)
+    fe_es_data = _load_locale_dir(fe_es)
+    es_key_count = len(_leaf_keys(fe_es_data))
+    en_key_count = len(_leaf_keys(fe_en_data))
     all_issues.extend(fe_issues)
     all_issues.extend(check_interpolation_parity(fe_en, fe_es, "FE"))
 
-    # Backend check: Python keys against locales/en.json
-    be_en = REPO / "locales" / "en.json"
-    be_es = REPO / "locales" / "es.json"
+    # Backend check: Python keys against locales/en/
+    be_en = REPO / "locales" / "en"
+    be_es = REPO / "locales" / "es"
     be_issues = check_locale(py_keys, be_en, "BE")
     all_issues.extend(be_issues)
     all_issues.extend(check_interpolation_parity(be_en, be_es, "BE"))
@@ -212,13 +229,15 @@ def main():
     total_issues = len(all_issues)
 
     if args.json:
+        be_en_data = _load_locale_dir(be_en)
+        be_es_data = _load_locale_dir(be_es)
         print(json.dumps({
             "python_code_keys": len(py_keys),
             "js_html_code_keys": len(js_html_keys),
             "frontend_en_keys": en_key_count,
             "frontend_es_keys": es_key_count,
-            "backend_en_keys": len(_leaf_keys(json.loads(be_en.read_text()))),
-            "backend_es_keys": len(_leaf_keys(json.loads(be_es.read_text()))),
+            "backend_en_keys": len(_leaf_keys(be_en_data)),
+            "backend_es_keys": len(_leaf_keys(be_es_data)),
             "issues": total_issues,
             "details": all_issues,
         }, indent=2))
@@ -230,8 +249,10 @@ def main():
         print(f"JS/HTML code keys:   {len(js_html_keys)}")
         print(f"Frontend en keys:    {en_key_count}")
         print(f"Frontend es keys:    {es_key_count}")
-        print(f"Backend en keys:     {len(_leaf_keys(json.loads(be_en.read_text())))}")
-        print(f"Backend es keys:     {len(_leaf_keys(json.loads(be_es.read_text())))}")
+        be_en_data = _load_locale_dir(be_en)
+        be_es_data = _load_locale_dir(be_es)
+        print(f"Backend en keys:     {len(_leaf_keys(be_en_data))}")
+        print(f"Backend es keys:     {len(_leaf_keys(be_es_data))}")
         print()
 
         if fe_issues:

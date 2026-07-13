@@ -36,9 +36,20 @@ function _t(locale, key, vars) {
   return _interpolate(val, vars);
 }
 
-// --- Load real locale data ---
-const enLocale = JSON.parse(readFileSync(join(REPO, 'static', 'locales', 'en.json'), 'utf-8'));
-const esLocale = JSON.parse(readFileSync(join(REPO, 'static', 'locales', 'es.json'), 'utf-8'));
+// --- Load real locale data (merge all files from per-namespace dirs) ---
+import { readdirSync, existsSync } from 'node:fs';
+function _loadLocaleDir(dirPath) {
+  const merged = {};
+  if (!existsSync(dirPath)) return merged;
+  for (const entry of readdirSync(dirPath).sort()) {
+    if (!entry.endsWith('.json')) continue;
+    const data = JSON.parse(readFileSync(join(dirPath, entry), 'utf-8'));
+    Object.assign(merged, data);
+  }
+  return merged;
+}
+const enLocale = _loadLocaleDir(join(REPO, 'static', 'locales', 'en'));
+const esLocale = _loadLocaleDir(join(REPO, 'static', 'locales', 'es'));
 
 // --- describe('i18n _resolve') ---
 describe('i18n _resolve', () => {

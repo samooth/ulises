@@ -16,22 +16,33 @@ LOCALES_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "locales"
 
 @lru_cache(maxsize=16)
 def _load_translations(lang: str) -> dict:
-    """Load a locale JSON file, falling back to English."""
-    path = os.path.join(LOCALES_DIR, f"{lang}.json")
-    try:
-        with open(path, "r", encoding="utf-8") as f:
-            return json.load(f)
-    except FileNotFoundError:
+    """Load locale files from a per-language directory, falling back to English.
+
+    Reads all ``*.json`` files from ``locales/{lang}/`` and merges them.
+    Each file should contain one top-level key matching its filename
+    (e.g. ``auth.json`` → ``{"auth": ...}``). Simple ``dict.update()``
+    is safe because top-level keys are unique namespaces.
+    """
+    dir_path = os.path.join(LOCALES_DIR, lang)
+    if not os.path.isdir(dir_path):
         if lang != "en":
-            logger.warning("Locale not found for '%s', falling back to 'en'", lang)
+            logger.warning("Locale dir not found for '%s', falling back to 'en'", lang)
             return _load_translations("en")
-        logger.warning("English locale not found at %s, using fallback", path)
+        logger.warning("Locale directory not found at %s, using empty fallback", dir_path)
         return {}
-    except json.JSONDecodeError as e:
-        logger.error("Failed to parse locale '%s': %s", lang, e)
-        if lang != "en":
-            return _load_translations("en")
-        return {}
+    merged: dict = {}
+    for fname in sorted(os.listdir(dir_path)):
+        if not fname.endswith(".json"):
+            continue
+        fp = os.path.join(dir_path, fname)
+        try:
+            with open(fp, "r", encoding="utf-8") as f:
+                data = json.load(f)
+            if isinstance(data, dict):
+                merged.update(data)
+        except (OSError, json.JSONDecodeError) as e:
+            logger.error("Failed to parse locale file %s: %s", fp, e)
+    return merged
 
 
 def _resolve(obj: dict, key: str) -> str | None:

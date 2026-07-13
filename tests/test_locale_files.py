@@ -4,18 +4,28 @@ from pathlib import Path
 REPO = Path(__file__).resolve().parent.parent
 
 FRONTEND_LOCALES = {
-    "en": REPO / "static" / "locales" / "en.json",
-    "es": REPO / "static" / "locales" / "es.json",
+    "en": REPO / "static" / "locales" / "en",
+    "es": REPO / "static" / "locales" / "es",
 }
 BACKEND_LOCALES = {
-    "en": REPO / "locales" / "en.json",
-    "es": REPO / "locales" / "es.json",
+    "en": REPO / "locales" / "en",
+    "es": REPO / "locales" / "es",
 }
 
 
-def _load(path: Path) -> dict:
-    with open(path, "r", encoding="utf-8") as f:
-        return json.load(f)
+def _load_dir(dir_path: Path) -> dict:
+    """Load all JSON files in a locale directory and merge."""
+    merged: dict = {}
+    if not dir_path.is_dir():
+        return merged
+    for fname in sorted(dir_path.iterdir()):
+        if not fname.name.endswith(".json"):
+            continue
+        with open(fname, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        if isinstance(data, dict):
+            merged.update(data)
+    return merged
 
 
 def _leaf_keys(obj: dict, prefix: str = "") -> set:
@@ -37,49 +47,49 @@ def _interpolation_vars(value: str) -> set:
 # --- JSON validity ---
 
 def test_frontend_en_json_valid():
-    _load(FRONTEND_LOCALES["en"])
+    _load_dir(FRONTEND_LOCALES["en"])
 
 
 def test_frontend_es_json_valid():
-    _load(FRONTEND_LOCALES["es"])
+    _load_dir(FRONTEND_LOCALES["es"])
 
 
 def test_backend_en_json_valid():
-    _load(BACKEND_LOCALES["en"])
+    _load_dir(BACKEND_LOCALES["en"])
 
 
 def test_backend_es_json_valid():
-    _load(BACKEND_LOCALES["es"])
+    _load_dir(BACKEND_LOCALES["es"])
 
 
 # --- Key parity ---
 
 def test_frontend_es_has_all_en_keys():
-    en = _leaf_keys(_load(FRONTEND_LOCALES["en"]))
-    es = _leaf_keys(_load(FRONTEND_LOCALES["es"]))
+    en = _leaf_keys(_load_dir(FRONTEND_LOCALES["en"]))
+    es = _leaf_keys(_load_dir(FRONTEND_LOCALES["es"]))
     missing = en - es
-    assert not missing, f"{len(missing)} keys missing from static/locales/es.json:\n  " + "\n  ".join(sorted(missing))
+    assert not missing, f"{len(missing)} keys missing from static/locales/es/:\n  " + "\n  ".join(sorted(missing))
 
 
 def test_frontend_no_extra_keys_in_es():
-    en = _leaf_keys(_load(FRONTEND_LOCALES["en"]))
-    es = _leaf_keys(_load(FRONTEND_LOCALES["es"]))
+    en = _leaf_keys(_load_dir(FRONTEND_LOCALES["en"]))
+    es = _leaf_keys(_load_dir(FRONTEND_LOCALES["es"]))
     extra = es - en
-    assert not extra, f"{len(extra)} extra keys in static/locales/es.json:\n  " + "\n  ".join(sorted(extra))
+    assert not extra, f"{len(extra)} extra keys in static/locales/es/:\n  " + "\n  ".join(sorted(extra))
 
 
 def test_backend_es_has_all_en_keys():
-    en = _leaf_keys(_load(BACKEND_LOCALES["en"]))
-    es = _leaf_keys(_load(BACKEND_LOCALES["es"]))
+    en = _leaf_keys(_load_dir(BACKEND_LOCALES["en"]))
+    es = _leaf_keys(_load_dir(BACKEND_LOCALES["es"]))
     missing = en - es
-    assert not missing, f"{len(missing)} keys missing from locales/es.json:\n  " + "\n  ".join(sorted(missing))
+    assert not missing, f"{len(missing)} keys missing from locales/es/:\n  " + "\n  ".join(sorted(missing))
 
 
 def test_backend_no_extra_keys_in_es():
-    en = _leaf_keys(_load(BACKEND_LOCALES["en"]))
-    es = _leaf_keys(_load(BACKEND_LOCALES["es"]))
+    en = _leaf_keys(_load_dir(BACKEND_LOCALES["en"]))
+    es = _leaf_keys(_load_dir(BACKEND_LOCALES["es"]))
     extra = es - en
-    assert not extra, f"{len(extra)} extra keys in locales/es.json:\n  " + "\n  ".join(sorted(extra))
+    assert not extra, f"{len(extra)} extra keys in locales/es/:\n  " + "\n  ".join(sorted(extra))
 
 
 # --- Interpolation variable parity ---
@@ -96,8 +106,8 @@ def _leaf_values(obj: dict, prefix: str = "") -> list:
 
 
 def _check_interpolation_parity(en_path: Path, es_path: Path, label: str):
-    en_pairs = _leaf_values(_load(en_path))
-    es_data = _load(es_path)
+    en_pairs = _leaf_values(_load_dir(en_path))
+    es_data = _load_dir(es_path)
     for key, en_val in en_pairs:
         es_val = _resolve_dot(es_data, key)
         if es_val is None:

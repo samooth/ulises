@@ -70,6 +70,36 @@ def deep_set(d, key_parts, value):
     d[key_parts[-1]] = value
 
 
+def _load_locale_dir(dir_path):
+    """Load all JSON files in a locale directory and merge."""
+    merged = {}
+    if not dir_path.is_dir():
+        return merged
+    for fname in sorted(dir_path.iterdir()):
+        if not fname.name.endswith(".json"):
+            continue
+        try:
+            data = json.loads(fname.read_text(encoding="utf-8"))
+            if isinstance(data, dict):
+                merged.update(data)
+        except (OSError, json.JSONDecodeError):
+            pass
+    return merged
+
+
+def _write_locale_dir(dir_path, data):
+    """Write a merged locale dict back into per-namespace files."""
+    dir_path.mkdir(parents=True, exist_ok=True)
+    for fname in list(dir_path.iterdir()):
+        if fname.name.endswith(".json"):
+            fname.unlink()
+    for namespace in sorted(data):
+        ns_file = dir_path / f"{namespace}.json"
+        with open(ns_file, "w", encoding="utf-8") as f:
+            json.dump({namespace: data[namespace]}, f, indent=2, ensure_ascii=False)
+            f.write("\n")
+
+
 def add_keys_to_nested(locale, keys):
     """Add dot-notation keys to a nested locale dict."""
     added = []
@@ -110,9 +140,9 @@ def add_keys_to_flat(locale, keys):
 
 
 def sync_locale_pair(en_path, es_path):
-    """Sync es.json to match en.json keys and interpolation vars."""
-    en = json.loads(en_path.read_text(encoding="utf-8"))
-    es = json.loads(es_path.read_text(encoding="utf-8"))
+    """Sync es locale to match en keys and interpolation vars."""
+    en = _load_locale_dir(en_path)
+    es = _load_locale_dir(es_path)
 
     is_nested = isinstance(next(iter(en.values())), (dict, str)) and not isinstance(next(iter(en.values())), str)
 
@@ -172,7 +202,7 @@ def sync_locale_pair(en_path, es_path):
                 d[parts[-1]] = en_val
                 changed += 1
 
-    es_path.write_text(json.dumps(es, indent=2, ensure_ascii=False) + "\n")
+    _write_locale_dir(es_path, es)
     return changed
 
 
@@ -186,9 +216,9 @@ def main():
     print(f"JS/HTML code keys: {len(js_html_keys)}")
 
     # Frontend locale (nested JSON)
-    fe_en_path = REPO / "static" / "locales" / "en.json"
-    fe_es_path = REPO / "static" / "locales" / "es.json"
-    fe_en = json.loads(fe_en_path.read_text(encoding="utf-8"))
+    fe_en_path = REPO / "static" / "locales" / "en"
+    fe_es_path = REPO / "static" / "locales" / "es"
+    fe_en = _load_locale_dir(fe_en_path)
 
     # Compute missing FE keys
     def leaf_keys(obj, prefix=""):
@@ -207,13 +237,13 @@ def main():
 
     if not args.check and fe_missing:
         added = add_keys_to_nested(fe_en, fe_missing)
-        fe_en_path.write_text(json.dumps(fe_en, indent=2, ensure_ascii=False) + "\n")
-        print(f"  Added {len(added)} keys to {fe_en_path.name}")
+        _write_locale_dir(fe_en_path, fe_en)
+        print(f"  Added {len(added)} keys to {fe_en_path}")
 
     # Backend locale (flat JSON)
-    be_en_path = REPO / "locales" / "en.json"
-    be_es_path = REPO / "locales" / "es.json"
-    be_en = json.loads(be_en_path.read_text(encoding="utf-8"))
+    be_en_path = REPO / "locales" / "en"
+    be_es_path = REPO / "locales" / "es"
+    be_en = _load_locale_dir(be_en_path)
 
     be_existing = set(be_en.keys())
     be_missing = py_keys - be_existing
@@ -227,15 +257,15 @@ def main():
 
     if not args.check and be_missing:
         added = add_keys_to_flat(be_en, be_missing)
-        be_en_path.write_text(json.dumps(be_en, indent=2, ensure_ascii=False) + "\n")
-        print(f"  Added {len(added)} keys to {be_en_path.name}")
+        _write_locale_dir(be_en_path, be_en)
+        print(f"  Added {len(added)} keys to {be_en_path}")
 
-    # Sync es.json files
-    print(f"\nSyncing es.json files...")
+    # Sync es files
+    print(f"\nSyncing es locale files...")
     fe_changed = sync_locale_pair(fe_en_path, fe_es_path)
     be_changed = sync_locale_pair(be_en_path, be_es_path)
-    print(f"  Frontend es.json: {fe_changed} changes")
-    print(f"  Backend es.json: {be_changed} changes")
+    print(f"  Frontend es/: {fe_changed} changes")
+    print(f"  Backend es/: {be_changed} changes")
 
     print("\nDone!")
 

@@ -36,7 +36,7 @@ function _detectLanguage() {
 
 async function _loadLocale(lang) {
   try {
-    const resp = await fetch(`/static/locales/${lang}.json`)
+    const resp = await fetch(`/api/i18n/${lang}`)
     if (!resp.ok) throw new Error(`HTTP ${resp.status}`)
     return await resp.json()
   } catch (e) {
