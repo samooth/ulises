@@ -7,7 +7,7 @@ Summarizes older messages via the same LLM, preserving key context.
 
 import json
 import logging
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional
 
 from src.model_context import get_context_length, estimate_tokens
 from src.llm_core import llm_call_async

@@ -110,10 +110,12 @@ from src.tool_execution import (  # noqa: E402, F401
 )
 
 # Implementations
-from src.tool_implementations import (  # noqa: E402, F401
+from src.agent_tools.document_tools import (  # noqa: E402, F401
     set_active_document,
     set_active_model,
     get_active_document,
+)
+from src.tool_implementations import (  # noqa: E402, F401
     do_create_document,
     do_update_document,
     do_edit_document,

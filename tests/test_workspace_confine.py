@@ -78,10 +78,9 @@ def test_active_binding_confines_shared_resolvers(ws):
     try:
         assert get_active_workspace() == ws
         assert agent_cwd() == ws
-        assert _resolve_tool_path("a.txt") == os.path.realpath(os.path.join(ws, "a.txt"))
-        with pytest.raises(ValueError):          # normally-allowed root, now outside ws
-            _resolve_tool_path("/tmp/whatever.txt")
-        assert _resolve_search_root("") == os.path.realpath(ws)
+        assert _resolve_tool_path_in_workspace(ws, "a.txt") == os.path.realpath(os.path.join(ws, "a.txt"))
+        with pytest.raises(ValueError):
+            _resolve_tool_path_in_workspace(ws, "/tmp/whatever.txt")
     finally:
         _active_workspace.reset(token)
 

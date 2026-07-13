@@ -16,6 +16,7 @@ import pathlib
 import re
 import sys
 import time
+from contextvars import ContextVar
 from typing import Any, Awaitable, Callable, Dict, Optional, Tuple
 
 
@@ -31,6 +32,20 @@ from src.tool_utils import _truncate, get_mcp_manager
 # Using this as cwd and HOME prevents the agent from silently creating files
 # in ephemeral container layers that are lost on the next rebuild.
 _AGENT_WORKDIR = DATA_DIR
+
+# Active workspace binding — a ContextVar set by execute_tool_block for the
+# duration of a tool call. Resets to None between calls (no cross-call leak).
+_active_workspace: ContextVar[Optional[str]] = ContextVar("_active_workspace", default=None)
+
+
+def get_active_workspace() -> Optional[str]:
+    return _active_workspace.get()
+
+
+def agent_cwd() -> str:
+    """Return the active workspace path, or the default agent working directory."""
+    ws = _active_workspace.get()
+    return ws if ws is not None else _AGENT_WORKDIR
 
 
 

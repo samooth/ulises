@@ -940,7 +940,7 @@ async def test_bare_email_dispatch_empty_content_calls_with_empty_args(monkeypat
     assert mcp.calls == [("mcp__email__list_email_accounts", {})]
 
 
-@py
+@pytest.mark.asyncio
 async def test_email_mcp_non_object_args_fail_before_dispatch(monkeypatch):
     import src.tool_execution as tool_execution
     from src.tool_execution import execute_tool_block
