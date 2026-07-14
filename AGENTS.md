@@ -65,3 +65,4 @@ Get CI green across all test suites and Docker build for the Ulises project.
 - `str | None` → `Optional[str]` in `core/translations.py:48` for Python 3.9 compat.
 - `GlobTool`: fall back to workspace root (instead of error) when `_resolve_search_root` rejects escaping paths; catch `NotImplementedError` from `rglob` with absolute patterns → treat as no match.
 - `GrepTool`: reverted to returning `exit_code: 1` for out-of-workspace paths (consistent with `LsTool`; test expects explicit error for grep/ls, but silent no-match for glob).
+- `bytes | str` → `Union[bytes, str]` in `src/llm_core.py` (two function signatures) for Python 3.9 compat; unblocks test collection blocked when conftest.py → core.models → src.llm_core.
