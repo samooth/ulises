@@ -39,10 +39,7 @@ See [MULTILANG.md](MULTILANG.md) for the multilanguage system.
 Get CI green across all test suites and Docker build for the Ulises project.
 
 ### Known Issues
-- **Docker build**: `numpy<2.0.0,>=1.26.0` conflicts with `fastembed>=0.3.0` on Python 3.13 (docker `python:3.13-slim`). fastembed 0.5+ requires numpy>=2.1.0 on py3.13. Fix: remove upper bound on numpy.
-- **Local test env**: `core/translations.py:48` uses `str | None` union syntax (Python 3.10+) but env is Python 3.9 → `TypeError` on import. Fix: switch to `Optional[str]` or `from __future__ import annotations`.
-- **CI test failures**: 61 failures after committed fixes (down from 93). Clusters around workspace confinement, web_fetch size caps, locale-loading edge cases.
-- **`test_glob_confined_e2e`**: Exit code 1 when expecting 0. Glob's escaping-pattern handling needs investigation.
+- **CI test failures**: 61 failures after committed fixes (down from 93). Clusters around workspace confinement, web_fetch size caps, locale-loading edge cases. Most recent commits fixed Docker build and glob/grep escape handling; need a CI run to confirm current count.
 
 ### Completed
 - `{{var}}` → `{var}` in both locale files for Python `.format()` compat.
@@ -64,3 +61,7 @@ Get CI green across all test suites and Docker build for the Ulises project.
 - `./i18n.js` import stubbed in markdown JS test harnesses.
 - `GlobTool._glob` wraps `p.relative_to(base)` in `try/except ValueError` → `continue`.
 - `WebFetchTool.execute` parses `full` param and passes `max_bytes=WEB_FETCH_HARD_MAX_BYTES`.
+- `numpy<2.0.0` → `numpy<3.0.0` in requirements.txt; `chromadb-client<1.0.0` → `<2.0.0` so Docker build resolves on Python 3.13.
+- `str | None` → `Optional[str]` in `core/translations.py:48` for Python 3.9 compat.
+- `GlobTool`: fall back to workspace root (instead of error) when `_resolve_search_root` rejects escaping paths; catch `NotImplementedError` from `rglob` with absolute patterns → treat as no match.
+- `GrepTool`: reverted to returning `exit_code: 1` for out-of-workspace paths (consistent with `LsTool`; test expects explicit error for grep/ls, but silent no-match for glob).
