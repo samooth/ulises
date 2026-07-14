@@ -10,7 +10,7 @@ SQLAlchemy>=2.0.0,<3.0.0
 pypdf>=6.14.2,<7.0.0
 beautifulsoup4>=4.12.0,<5.0.0
 charset-normalizer>=3.0.0,<4.0.0
-numpy>=1.26.0,<2.0.0
+numpy>=1.26.0,<3.0.0
 # Vector store + local embeddings for RAG, semantic memory, and tool
 # selection. Used on core agent paths, so installed by default — the app
 # still degrades to keyword fallback if they're ever missing.

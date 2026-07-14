@@ -8,6 +8,7 @@ import re
 import logging
 import locale as _locale_mod
 from functools import lru_cache
+from typing import Optional
 
 logger = logging.getLogger(__name__)
 
@@ -45,7 +46,7 @@ def _load_translations(lang: str) -> dict:
     return merged
 
 
-def _resolve(obj: dict, key: str) -> str | None:
+def _resolve(obj: dict, key: str) -> Optional[str]:
     """Resolve a dot-separated key in a nested dict."""
     parts = key.split(".")
     for p in parts:

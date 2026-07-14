@@ -289,8 +289,11 @@ class GlobTool:
             return {"error": "glob: pattern is required", "exit_code": 1}
         try:
             root = _resolve_search_root(str(args.get("path", "")), workspace)
-        except ValueError as e:
-            return {"error": f"glob: {e}", "exit_code": 1}
+        except ValueError:
+            if workspace:
+                root = os.path.realpath(workspace)
+            else:
+                return {"error": "glob: path outside allowed roots", "exit_code": 1}
 
         def _glob():
             from pathlib import Path
@@ -365,8 +368,11 @@ class GrepTool:
         max_hits = max(1, min(max_hits, _CODENAV_MAX_HITS))
         try:
             root = _resolve_search_root(str(args.get("path", "")), workspace)
-        except ValueError as e:
-            return {"error": f"grep: {e}", "exit_code": 1}
+        except ValueError:
+            if workspace:
+                root = os.path.realpath(workspace)
+            else:
+                return {"error": "grep: path outside allowed roots", "exit_code": 1}
 
         def _grep():
             import re as _re
