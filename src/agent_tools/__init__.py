@@ -40,6 +40,26 @@ TOOL_HANDLERS = {
 from .admin_tools import ADMIN_TOOL_HANDLERS
 TOOL_HANDLERS.update(ADMIN_TOOL_HANDLERS)
 
+from .document_tools import (
+    ManageDocumentTool, CreateDocumentTool, UpdateDocumentTool, EditDocumentTool, SuggestDocumentTool,
+)
+TOOL_HANDLERS["create_document"] = CreateDocumentTool().execute
+TOOL_HANDLERS["update_document"] = UpdateDocumentTool().execute
+TOOL_HANDLERS["edit_document"] = EditDocumentTool().execute
+TOOL_HANDLERS["suggest_document"] = SuggestDocumentTool().execute
+TOOL_HANDLERS["manage_documents"] = ManageDocumentTool().execute
+
+from .model_interaction_tools import ChatWithModelTool, AskTeacherTool, ListModelsTool
+TOOL_HANDLERS["chat_with_model"] = ChatWithModelTool().execute
+TOOL_HANDLERS["ask_teacher"] = AskTeacherTool().execute
+TOOL_HANDLERS["list_models"] = ListModelsTool().execute
+
+from .session_tools import CreateSessionTool, ListSessionsTool, SendToSessionTool, ManageSessionTool
+TOOL_HANDLERS["create_session"] = CreateSessionTool().execute
+TOOL_HANDLERS["list_sessions"] = ListSessionsTool().execute
+TOOL_HANDLERS["send_to_session"] = SendToSessionTool().execute
+TOOL_HANDLERS["manage_session"] = ManageSessionTool().execute
+
 # ---------------------------------------------------------------------------
 # Constants (re-exported for backward compatibility — single source of truth
 # is src.constants; always prefer importing from there for new code)
@@ -66,6 +86,8 @@ TOOL_TAGS = {"bash", "python", "web_search", "web_fetch", "read_file", "write_fi
              "resolve_contact", "manage_contact", "list_email_accounts", "send_email", "list_emails",
              "read_email", "reply_to_email", "bulk_email", "archive_email",
              "delete_email", "mark_email_read",
+             "search_emails", "draft_email", "draft_email_reply", "ai_draft_email_reply",
+             "download_attachment",
              # Cookbook tools (LLM serving + downloads). Without these
              # entries, native function calls to e.g. list_served_models
              # are rejected as "Unknown function call" before reaching

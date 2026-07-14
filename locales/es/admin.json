@@ -12,6 +12,7 @@
     "no_models_found": "No se encontraron modelos o el endpoint está fuera de línea",
     "workspace_admin_only": "La navegación del espacio de trabajo es solo para administradores",
     "workspace_selection_admin": "La selección de espacio de trabajo es solo para administradores",
-    "integration_not_found": "Integración no encontrada"
+    "integration_not_found": "Integración no encontrada",
+    "api_token_not_scoped": "El API token no tiene permisos para chat"
   }
 }

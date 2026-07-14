@@ -133,10 +133,10 @@ _MCP_DANGEROUS_ENV = frozenset({
 
 def _mcp_allowed_commands() -> set:
     """Operator-configured allowlist of safe MCP launcher basenames for the agent
-    path. Empty by default; set ODYSSEUS_MCP_ALLOWED_COMMANDS (comma-separated)
-    to opt specific trusted binaries in. Denied commands are rejected even if
-    listed here."""
-    raw = os.environ.get("ODYSSEUS_MCP_ALLOWED_COMMANDS", "")
+    path. Empty by default (all non-denied commands are allowed); set
+    ULISES_MCP_ALLOWED_COMMANDS (comma-separated) to opt specific trusted
+    binaries in. Denied commands are rejected even if listed here."""
+    raw = os.environ.get("ULISES_MCP_ALLOWED_COMMANDS") or os.environ.get("ODYSSEUS_MCP_ALLOWED_COMMANDS", "")
     return {c.strip().lower() for c in raw.split(",") if c.strip()}
 
 
@@ -170,10 +170,11 @@ def _validate_mcp_command(command, args, env) -> Optional[str]:
             "interpreters, runtimes, package runners, and shells can execute "
             "arbitrary code. Register such a server via the admin route instead."
         )
-    if base not in _mcp_allowed_commands():
+    allowed = _mcp_allowed_commands()
+    if allowed and base not in allowed:
         return (
             f"command '{command}' is not in the MCP allowlist. Add it to "
-            "ODYSSEUS_MCP_ALLOWED_COMMANDS if you trust it, or register the "
+            "ULISES_MCP_ALLOWED_COMMANDS if you trust it, or register the "
             "server via the admin route."
         )
 

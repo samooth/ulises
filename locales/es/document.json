@@ -12,6 +12,7 @@
     "no_documents_found": "No se encontraron documentos",
     "all_already_reviewed": "Todos los documentos ya fueron revisados",
     "auth_required": "Autenticación requerida",
-    "session_not_found": "Sesión no encontrada"
+    "session_not_found": "Sesión no encontrada",
+    "pdf_viewer_unavailable": "Visor de PDF no disponible: {error}"
   }
 }

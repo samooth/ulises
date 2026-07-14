@@ -12,6 +12,7 @@
     "no_models_found": "No models found or endpoint offline",
     "workspace_admin_only": "Workspace browsing is admin-only",
     "workspace_selection_admin": "Workspace selection is admin-only",
-    "integration_not_found": "Integration not found"
+    "integration_not_found": "Integration not found",
+    "api_token_not_scoped": "API token is not scoped for chat"
   }
 }

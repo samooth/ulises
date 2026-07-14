@@ -54,6 +54,7 @@
     "cc_label": "Cc",
     "date_label": "Date",
     "body_label": "Body",
-    "attachments_label": "Attachments"
+    "attachments_label": "Attachments",
+    "microsoft_auth_disabled": "Microsoft no longer accepts normal mailbox passwords for Outlook/Office 365 IMAP/SMTP in most accounts. Ulises does not support Microsoft OAuth/Graph mail yet, so Outlook accounts cannot be added with this password form."
   }
 }

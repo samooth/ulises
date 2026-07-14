@@ -14,6 +14,9 @@
     "pty_not_supported": "La transmisión PTY no es compatible en esta plataforma",
     "invalid_ssh_port": "ssh_port inválido",
     "ssh_port_requires_host": "ssh_port requiere un host",
-    "rebuild_engine_timed_out": "El comando de reconstrucción del motor agotó el tiempo de espera."
+    "rebuild_engine_timed_out": "El comando de reconstrucción del motor agotó el tiempo de espera.",
+    "docker_in_container_hint": "El acceso al daemon de Docker local está desactivado dentro del contenedor de Ulises; solo tener la CLI de Docker no es suficiente. Docker Compose predeterminado no monta el socket de Docker del host intencionalmente. El acceso sin procesar al socket es de alta confianza y puede otorgar control amplio sobre el daemon de Docker del host. Si acepta ese riesgo, active docker/host-docker.yml. Los flujos de trabajo remotos de Docker sobre SSH siguen siendo preferidos.",
+    "update_native_vllm": "Usando una CLI de vLLM en PATH sin metadatos de paquete de Python; actualícela fuera de Ulises.",
+    "update_native_llama_server": "Usando llama-server nativo en PATH; actualícelo con su gestor de paquetes o checkout de código fuente."
   }
 }

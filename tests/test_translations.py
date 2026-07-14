@@ -29,12 +29,13 @@ def test_load_translations_unknown_locale_falls_back_to_en():
     assert data == en_data
 
 
-def test_load_translations_missing_file_returns_empty_for_en(caplog):
+def test_load_translations_missing_file_falls_back_to_en(caplog):
     caplog.set_level(logging.WARNING)
     nonexistent = str(REPO / "locales" / "nonexistent.json")
     with patch("core.translations.LOCALES_DIR", str(REPO / "locales")):
         result = _load_translations("nonexistent")
-    assert result == {}
+    en_data = _load_translations("en")
+    assert result == en_data
 
 
 # --- _resolve ---

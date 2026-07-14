@@ -3511,3 +3511,23 @@ async def do_vault_unlock(content: str, owner: Optional[str] = None) -> Dict:
         pass
 
     return {"output": "Vault unlocked. Session saved.", "exit_code": 0}
+
+
+# ── Shim re-exports for backward compatibility ──────────────────────────────
+# Functions moved to src.agent_tools.admin_tools are lazily re-exported so that
+# existing ``from src.tool_implementations import do_manage_*`` continue working.
+_ADMIN_TOOL_MODULE = None  # lazy-loaded
+
+
+def _get_admin_tools():
+    global _ADMIN_TOOL_MODULE
+    if _ADMIN_TOOL_MODULE is None:
+        from src.agent_tools import admin_tools as _ADMIN_TOOL_MODULE
+    return _ADMIN_TOOL_MODULE
+
+
+def __getattr__(name):
+    admin_tools = _get_admin_tools()
+    if hasattr(admin_tools, name):
+        return getattr(admin_tools, name)
+    raise AttributeError(f"module 'src.tool_implementations' has no attribute {name!r}")

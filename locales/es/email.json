@@ -54,6 +54,7 @@
     "send_at_required": "La fecha de envío es requerida",
     "style_generation_failed": "Error al generar estilo",
     "to_label": "Para:",
-    "unsupported_attachment_type": "Tipo de adjunto '{ext}' no soportado"
+    "unsupported_attachment_type": "Tipo de adjunto '{ext}' no soportado",
+    "microsoft_auth_disabled": "Microsoft ya no acepta contraseñas de correo normales para cuentas de Outlook/Office 365 IMAP/SMTP. Ulises no soporta OAuth/Graph de Microsoft todavía, por lo que las cuentas de Outlook no pueden agregarse con este formulario de contraseña."
   }
 }
