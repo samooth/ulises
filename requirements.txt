@@ -16,7 +16,7 @@ numpy>=1.26.0,<3.0.0
 # still degrades to keyword fallback if they're ever missing.
 # chromadb-client is the lightweight HTTP client (talks to a standalone
 # ChromaDB service); fastembed runs local ONNX embeddings.
-chromadb-client>=0.5.0,<1.0.0
+chromadb-client>=0.5.0,<2.0.0
 fastembed>=0.3.0,<1.0.0
 youtube-transcript-api>=0.6.0,<1.0.0
 # Markdown rendering for research reports (src/visual_report.py).

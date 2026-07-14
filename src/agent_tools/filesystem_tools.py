@@ -325,6 +325,8 @@ class GlobTool:
                         break
             except OSError as _e:
                 return None, f"glob: {_e}"
+            except NotImplementedError:
+                return [], None
             matched.sort(key=lambda t: t[0], reverse=True)
             return [pth for _, pth in matched[:_CODENAV_MAX_HITS]], None
 
@@ -368,11 +370,8 @@ class GrepTool:
         max_hits = max(1, min(max_hits, _CODENAV_MAX_HITS))
         try:
             root = _resolve_search_root(str(args.get("path", "")), workspace)
-        except ValueError:
-            if workspace:
-                root = os.path.realpath(workspace)
-            else:
-                return {"error": "grep: path outside allowed roots", "exit_code": 1}
+        except ValueError as e:
+            return {"error": f"grep: {e}", "exit_code": 1}
 
         def _grep():
             import re as _re
