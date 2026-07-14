@@ -9,7 +9,7 @@ import threading
 import re
 import os
 from fastapi import HTTPException
-from typing import Optional, Dict, List, Tuple
+from typing import Optional, Dict, List, Tuple, Union
 from src.model_context import get_context_length, DEFAULT_CONTEXT
 from urllib.parse import urlparse
 
@@ -496,7 +496,7 @@ def _kimi_code_base_key(url: str) -> str:
     return f"{parsed.scheme}://{parsed.netloc}{path}"
 
 
-def _is_kimi_code_access_denied(status: int, body: bytes | str) -> bool:
+def _is_kimi_code_access_denied(status: int, body: Union[bytes, str]) -> bool:
     if status != 403:
         return False
     text = body.decode("utf-8", errors="replace") if isinstance(body, bytes) else (body or "")
@@ -823,7 +823,7 @@ def _format_chatgpt_subscription_error(status_code: int, text: str) -> str:
     return _format_upstream_error(status_code, text, "https://chatgpt.com/backend-api/codex")
 
 
-def _format_upstream_error(status: int, body: bytes | str, url: str) -> str:
+def _format_upstream_error(status: int, body: Union[bytes, str], url: str) -> str:
     """Turn an upstream HTTP error into a user-readable sentence.
 
     Auth failures (401/403) become 'xAI rejected the API key' etc., so the UI
