@@ -69,7 +69,7 @@ TOKEN_TTL = 60 * 60 * 24 * 7  # 7 days
 RESERVED_USERNAMES = frozenset({INTERNAL_TOOL_USER, "api", "demo", "system"})
 
 
-def normalize_known_username(users: Dict[str, Any], username: str | None) -> Optional[str]:
+def normalize_known_username(users: Dict[str, Any], username: Optional[str]) -> Optional[str]:
     """Return a normalized username only when it exists in the auth user map."""
     key = str(username or "").strip().lower()
     if not key or key not in users:
