@@ -404,14 +404,7 @@ def test_service_health_sub_area_command_includes_split_files():
         "-m",
         "pytest",
         "-m",
-        (
-            "(sub_service_health_chromadb or "
-            "sub_service_health_search or "
-            "sub_service_health_ntfy or "
-            "sub_service_health_email or "
-            "sub_service_health_providers or "
-            "sub_service_health_collect)"
-        ),
+        "sub_service_health",
     ]
 
 
@@ -430,12 +423,5 @@ def test_service_health_alias_is_accepted_by_run():
         "-m",
         "pytest",
         "-m",
-        (
-            "(sub_service_health_chromadb or "
-            "sub_service_health_search or "
-            "sub_service_health_ntfy or "
-            "sub_service_health_email or "
-            "sub_service_health_providers or "
-            "sub_service_health_collect)"
-        ),
+        "sub_service_health",
     ]

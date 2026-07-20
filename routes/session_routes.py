@@ -918,6 +918,7 @@ def setup_session_routes(session_manager: SessionManager, config: dict, webhook_
     async def compact_session(request: Request, session_id: str):
         """Summarize older messages into one compacted history entry."""
         _verify_session_owner(request, session_id)
+        _reject_compact_during_active_run(session_id)
         try:
             session = session_manager.get_session(session_id)
         except KeyError:

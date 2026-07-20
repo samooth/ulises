@@ -378,6 +378,7 @@ class GrepTool:
             import shutil
             rg = shutil.which("rg")
             if rg:
+                from src.tool_execution import _is_sensitive_path
                 cmd = [rg, "--line-number", "--no-heading", "--color=never",
                        "--max-count", str(max_hits)]
                 if ignore_case:
@@ -390,8 +391,15 @@ class GrepTool:
                 try:
                     import subprocess
                     p = subprocess.run(cmd, capture_output=True, text=True, timeout=20)
-                    lines = [ln for ln in (p.stdout or "").splitlines() if ln][:max_hits]
-                    return lines, None
+                    lines = []
+                    for ln in (p.stdout or "").splitlines():
+                        if not ln:
+                            continue
+                        fp = ln.split(":", 1)[0] if ":" in ln else ""
+                        if fp and _is_sensitive_path(os.path.abspath(fp)):
+                            continue
+                        lines.append(ln)
+                    return lines[:max_hits], None
                 except subprocess.TimeoutExpired:
                     return None, "grep: timed out"
                 except Exception as _e:

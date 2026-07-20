@@ -734,6 +734,7 @@ def test_require_admin_allows_when_auth_explicitly_disabled(monkeypatch):
     class _Req:
         state = _State()
         app = _App()
+        headers = {}
 
     assert require_admin(_Req()) is None
 
